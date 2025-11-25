@@ -50,7 +50,7 @@
                         <div class="card-icon">💾</div>
                         <div class="card-content">
                             <h3>图片尺寸</h3>
-                            <p>代码逻辑无上限，实际受浏览器限制<span class="tooltip-trigger" data-tooltip="浏览器可上传图片最大尺寸：&#10;Chrome/Edge: 约 65,535×65,535 像素。&#10;Firefox: 约 32,767×32,767 像素。&#10;Safari: 约 4,096×4,096 像素（较低）。&#10;&#10;超过限制会导致图片加载失败。">ⓘ</span>和设备可用内存限制<span class="tooltip-trigger" data-tooltip="图片内存占用计算：&#10;宽度 × 高度 × 4 字节（RGBA每通道1字节）。&#10;&#10;示例：&#10;40,000×4,000 像素 ≈ 610 MB。&#10;60,000×5,000 像素 ≈ 1.12 GB。&#10;&#10;技术说明：&#10;图片加载后会占用内存：&#10;1. 原始压缩文件（JPEG/PNG，通常几MB）。&#10;2. 解码后的位图（CPU内存，宽×高×4字节）。&#10;3. GPU纹理（如启用硬件加速，可能占用额外显存）。&#10;&#10;浏览器优化策略：&#10;缓存复用、延迟解码、纹理合并、视口外缩略。&#10;&#10;注意：大图片内存占用接近理论值。&#10;内存不足会导致浏览器崩溃或卡顿。">ⓘ</span></p>
+                            <p>代码逻辑无上限，实际受浏览器限制<span class="tooltip-trigger" data-tooltip="浏览器可上传图片最大尺寸：&#10;Chrome/Edge: 约 65,535×65,535 像素。&#10;Firefox: 约 32,767×32,767 像素。&#10;Safari: 约 4,096×4,096 像素（较低）。&#10;&#10;超过限制会导致图片加载失败。">ⓘ</span>和设备可用内存限制<span class="tooltip-trigger" data-tooltip="图片内存占用计算：&#10;宽度 × 高度 × 4 字节（RGBA每通道1字节）。&#10;&#10;示例：&#10;40,000×4,000 像素 ≈ 610 MB。&#10;60,000×5,000 像素 ≈ 1.12 GB。&#10;&#10;技术说明：&#10;图片加载后会占用内存：&#10;1. 原始压缩文件（JPEG/PNG，通常几MB）。&#10;2. 解码后的位图（CPU内存，宽×高×4字节）。&#10;3. GPU纹理（如启用硬件加速，可能占用额外显存）。&#10;&#10;浏览器优化策略：&#10;缓存复用、延迟解码、纹理合并、视口外缩略。&#10;&#10;注意：大图片内存占用接近理论值。&#10;内存不足会导致浏览器崩溃或卡顿。">ⓘ</span>。</p>
                         </div>
                     </div>
 
@@ -66,7 +66,7 @@
                         <div class="card-icon">🎬</div>
                         <div class="card-content">
                             <h3>使用方式</h3>
-                            <p>上传图片调整参数(建议F11全屏)后录屏即可。</p>
+                            <p>上传图片调整参数(建议F11全屏)后录屏即可。<br><a href="#" class="tutorial-link" target="_blank">视频教程</a></p>
                         </div>
                     </div>
                 </div>
@@ -336,9 +336,18 @@
                             <span class="btn-icon">💾</span>
                             导出配置
                         </button>
-                        <button class="btn-info" id="aboutBtn">
-                            <span class="btn-icon">ℹ️</span>
-                            关于
+                        <button class="btn-info btn-flip-container" id="aboutBtn">
+                            <span class="btn-flip-inner">
+                                <span class="btn-flip-front">
+                                    <span class="btn-icon">ℹ️</span>
+                                    关于
+                                </span>
+                                <span class="btn-flip-back">
+                                    关于我，<br>没有们
+                                </span>
+                                <span class="btn-flip-top"></span>
+                                <span class="btn-flip-bottom"></span>
+                            </span>
                         </button>
                     </div>
                     
@@ -420,12 +429,12 @@
                     <p>这是一个免费开源的项目，旨在帮助用户更方便地制作滚动类视频。</p>
                     <p>正因为本项目免费，所以本身并不赚钱，再加上时间精力成本以及开发者近几年在开发独立游戏，精神状态很差的缘故，因此本项目在未来<span class="highlight-warning">大概率不会进行更新</span>，添加更多新功能(如支持上传多张图片，拼接进行滚动[漫画阅读]，支持竖图上下滚动，支持直接导出为视频<span class="tooltip-trigger" data-tooltip="浏览器原生MediaRecorder API对超大分辨率支持不佳。就算要实现也会考虑配合后端实现。">ⓘ</span>，支持命令模式，命令行输入命令上传配置导出一步到位，支持创建画布，直接添加/编辑卡片，可导入.csv/.json文件批量生成卡片，支持自定义卡片排序规则<span class="tooltip-trigger" data-tooltip="即可按照票数、序号、生日、年龄等任何数字字段进行升序/降序。">ⓘ</span>，新增桌面应用)，有能力的可以选择赞助开发者(完全自愿)，感谢您的支持！</p>
                     <p>你可能经常听到"谁不是为了赚钱而工作？"这句话，但我就是个反例，市面上还有很多其他开源免费的项目，这个项目只是冰山一角而已，其他开发者开源免费也一定有他们的原因。但是请不要误以为每位开发者都是有钱人。</p>
-                    <p>本项目共由一人<span class="tooltip-trigger" data-tooltip="一人包揽架构设计、前端、UI/UX、测试，本项目不含后端，也无需运维。">ⓘ</span>完成开发，从新建文件夹到首次上线共耗时两位数天(每天10-12小时，居家开发，没有工作，<span class="hidden-text">即没有收入</span>)。</p>
+                    <p>本项目共由一人<span class="tooltip-trigger" data-tooltip="一人包揽架构设计、前端、UI/UX、测试，本项目不含后端，也无需运维。">ⓘ</span>完成开发，从新建文件夹到首次上线共耗时68天<span class="tooltip-trigger" data-tooltip-html="<div><p><strong>开发阶段：</strong></p><p><strong>5天</strong>完成<strong>基础功能</strong>开发</p><p>又<strong>7天</strong>完成第一次<strong>代码质量优化重构</strong></p><p>又<strong>12天</strong>完成第二次<strong>代码质量优化重构</strong></p><p>原本就这样打算宣布开发完毕的，但凭着<strong>最后一丝热情</strong>在剩下<strong>34天</strong>完成了<strong>入场动画和性能监控</strong>两个新功能的开发以及最后的善后工作。</p><br><p><strong>时间跨度：</strong>2025/09/18-2025/11/25</p><p><strong>说明：</strong>多出来的<strong>10天</strong>为休息日。</p></div>">ⓘ</span>(每天10-12小时，居家开发，没有工作，<span class="hidden-text">即没有收入</span>)。</p>
                     <p><span class="hidden-text">唉，在只有时间的情况下，一个人是不可能做出团队规模的项目的~</span></p>
                     <p>如果在使用过程中发现间歇性Bug<span class="tooltip-trigger" data-tooltip="间歇性Bug：有时出现、有时不出现的Bug，难以稳定复现。">ⓘ</span>，建议直接刷新页面，这类Bug不好测试，多半是竞态条件（Race Condition）<span class="tooltip-trigger" data-tooltip="竞态条件：多个操作的执行顺序或时机不确定，导致结果不可预测。">ⓘ</span>造成的。</p>
                 </div>
                 <div class="contact-item">
-                    <span class="contact-text">如有任何建议、意见、问题，或是想说句鼓励的话，都欢迎发邮件至：<span id="contactEmail"></span></span>
+                    <span class="contact-text">如有任何建议、意见、问题，或是想说句鼓励的话，都欢迎发邮件至：<span id="contactEmail"></span>。</span>
                     <button class="contact-item-copy-btn" id="copyEmailBtn">
                         <svg width="16" height="16">
                             <use href="#icon-copy"/>
@@ -999,11 +1008,11 @@
                                  </p>
                                  <div class="performance-optimizations-wrapper" id="performanceOptimizationsWrapper">
                                      <div class="performance-optimizations-list" id="performanceOptimizationsList">
-                                        1. 独立Canvas架构：入场动画使用独立viewport尺寸Canvas，滚动动画使用完整尺寸Canvas<br>
-                                        2. Viewport裁剪：入场动画仅渲染可见区域，大幅减少Canvas物理像素<br>
+                                        1. 入场动画使用独立viewport尺寸Canvas，滚动动画使用完整尺寸Canvas，大幅减少入场动画渲染像素数量<br>
+                                        2. 入场动画仅渲染可见区域，通过Viewport裁剪大幅减少Canvas物理像素<br>
                                         3. 预先缩放图片到离屏Canvas，避免每帧实时缩放<br>
                                         4. 预先裁剪每张卡片到独立离屏Canvas，避免每帧裁剪<br>
-                                        5. 智能状态管理：简单动画手动管理透明度，复杂动画（旋转/模糊）才使用save/restore<br>
+                                        5. 简单动画手动管理透明度，复杂动画（旋转/模糊）才使用save/restore，减少Canvas状态操作开销<br>
                                         6. 使用WeakMap缓存Canvas 2D上下文，避免重复getContext调用<br>
                                         7. 缓存背景色，避免每帧从状态管理器读取<br>
                                         8. 缓存动画策略实例，避免每帧查找策略<br>
@@ -1023,7 +1032,7 @@
                                      </div>
                                  </div>
                                  <p class="performance-hint-advice">
-                                     如果您的设备在使用过程中仍感觉卡顿、掉帧、不流畅、有延迟，那么建议在PPT中制作入场动画，然后再配合该工具的滚动动画进行视频剪辑。
+                                     如果您的设备在使用过程中仍然出现卡顿、掉帧、不流畅、延迟等问题（根本原因是Canvas物理像素过多），建议在PPT中制作入场动画，然后配合该工具的滚动动画进行视频剪辑。
                                  </p>
                             </div>
                         </div>

@@ -65,7 +65,7 @@
 > ⚠️ **设备要求**：本项目仅支持桌面浏览器，不支持移动端设备。
 
 ### 在线使用
-1. 访问在线版本：[链接待添加]
+1. 访问在线版本：https://hatsusumi.github.io/CardScroller/
 2. 上传你的长图片
 3. 调整滚动参数
 4. 点击播放预览效果
@@ -73,22 +73,30 @@
 
 ### 本地部署
 
+> 📦 **项目大小**：
+> - ZIP下载：约96MB（包含源码和示例图片，不含版本历史）
+> - Git克隆：约103MB（含完整版本历史）
+
+**第一步：获取项目文件**
+1. 访问 GitHub 仓库：https://github.com/HatsuSumi/CardScroller
+2. 点击绿色的 **Code** 按钮
+3. 选择 **Download ZIP**
+4. 解压下载的文件（文件夹会命名为 CardScroller-main，可重命名为 CardScroller）
+
+**第二步：选择启动方式**
+
 #### 方法1：使用启动脚本（最简单，推荐）
 **Windows用户：**
-1. 下载项目到本地（如 `F:\CardScroller`）
-2. 双击项目根目录的 `start.bat` 文件
-3. 脚本会自动检测Python环境、启动服务器并打开浏览器
+1. 双击项目根目录的 `start.bat` 文件
+2. 脚本会自动检测Python环境、启动服务器并打开浏览器
 
 #### 方法2：使用VS Code Live Server扩展
-1. 下载项目到本地（如 `F:\CardScroller`）
-2. 用VS Code打开项目文件夹
-3. 安装Live Server扩展
-4. 右键index.html选择"Open with Live Server"
+1. 用VS Code打开项目文件夹
+2. 安装Live Server扩展
+3. 右键index.html选择"Open with Live Server"
 
 #### 方法3：Python服务器
-1. 下载项目到本地（如 `F:\CardScroller`）
-
-2. 启动本地服务器：
+1. 启动本地服务器：
 
    **Windows用户：**
    ```powershell
@@ -113,11 +121,11 @@
 #### 方法4：Git克隆（开发者推荐）
 ```bash
 # 克隆项目到本地
-git clone https://github.com/yourusername/CardScroller.git
+git clone https://github.com/HatsuSumi/CardScroller.git
 cd CardScroller
 
 # 或者使用SSH
-git clone git@github.com:yourusername/CardScroller.git
+git clone git@github.com:HatsuSumi/CardScroller.git
 cd CardScroller
 
 # 然后使用上述任意方法启动服务器
@@ -282,15 +290,15 @@ CardScroller/
 
 ### 代码规模
 
-- **代码总行数**：27,438 行（不含空行、注释）
-  - JavaScript：18,777 行（68.4%）
-  - CSS：6,883 行（25.1%）
-  - HTML：1,778 行（6.5%）
+- **代码总行数**：27,540 行（不含空行、注释）
+  - JavaScript：18,777 行（68.2%）
+  - CSS：6,976 行（25.3%）
+  - HTML：1,787 行（6.5%）
 
-- **字符总数**：1,227,070 字符（不含注释）
-  - JavaScript：931,388 字符（75.9%）
-  - CSS：179,630 字符（14.6%）
-  - HTML：116,052 字符（9.5%）
+- **字符总数**：1,230,483 字符（不含注释）
+  - JavaScript：931,388 字符（75.7%）
+  - CSS：181,938 字符（14.8%）
+  - HTML：117,157 字符（9.5%）
 
 ### JavaScript 代码结构
 
@@ -379,7 +387,7 @@ CardScroller/
      - 键盘方向键微调（逐像素精确定位）
    - 实时预览和配置管理
 
-3. **UI/UX 动画效果**（33 种 CSS @keyframes 关键帧动画 + 170 个 transition 过渡 + 112 个 :hover 交互 + 5 个 SVG 动画 + 2 个 Canvas 动画 + 1 个 JS 数值动画）
+3. **UI/UX 动画效果**（33 种 CSS @keyframes 关键帧动画 + 174 个 transition 过渡 + 116 个 :hover 交互 + 5 个 SVG 动画 + 2 个 Canvas 动画 + 1 个 JS 数值动画）
    
    **CSS @keyframes 关键帧动画**（33 种）：
    - **页面载入**：fadeInUp（欢迎界面淡入上移30px）、fadeInUpShort（入场动画字段淡入上移20px）、slideInUp（性能面板上滑入场）、fadeOutDown（配置字段退出）
@@ -404,7 +412,7 @@ CardScroller/
    - **性能可视化过渡动画**：
      - maskFadeOut / maskFadeIn（网格遮罩转场：8x8纯色网格方块，0.8s ease-in-out，波浪渐变效果）
    
-   **CSS transition 过渡**（170 个）：
+   **CSS transition 过渡**（174 个）：
    - **按钮/控件类**（61 个）：控制面板、折叠按钮、各类功能按钮、复制按钮、刷新按钮等，过渡效果包括 transform、opacity、box-shadow、border-color 等
    - **卡片/列表项类**（23 个）：信息卡片、二维码卡片、序列项、动画项、位置信息项、指标卡片等，效果包括 transform、opacity、box-shadow 等
    - **模态框/对话框类**（20 个）：位置选择、关于页面、图片信息、高级循环、颜色选择器等各类模态框，过渡效果为 opacity + visibility、transform 弹性缓动等
@@ -419,8 +427,8 @@ CardScroller/
    - **动画元素类**（4 个）：颜色预设框、气泡菜单、可视化视图等
    - **其他**（20 个）：图片预览、进度倒计时、隐藏文本、折叠内容、滚动条等
    
-   **CSS :hover 交互动画**（112 个）：
-   - **按钮类**（50 个）：各类按钮、关闭按钮、复制按钮等，效果包括颜色变化、阴影增强、缩放、位移（transform translateY）
+   **CSS :hover 交互动画**（116 个）：
+   - **按钮类**（52 个）：各类按钮、关闭按钮、复制按钮等，效果包括颜色变化、阴影增强、缩放、位移（transform translateY）、3D立方体翻转（关于按钮：rotateX 180° + 立方体侧面 + 背景色切换）
    - **卡片类**（10 个）：
      - 信息卡片（上移 translateY(-5px) + 阴影增强 + 顶部渐变条显示 via ::before）
      - 二维码卡片（卡片上移 translateY(-4px) + 内部图片放大 scale 1.05）
@@ -430,7 +438,7 @@ CardScroller/
      - 滑块拖动手柄、复选框、输入框边框
      - 颜色选择器预设色（transform scale 1.15 + 边框高亮 + 阴影增强）
    - **滚动条类**（12 个）：面板、对话框、下拉菜单、列表等滚动条悬停变色
-   - **链接/导航类**（8 个）：帮助链接、导航项、气泡菜单项等
+   - **链接/导航类**（10 个）：帮助链接、导航项、气泡菜单项、视频教程链接（颜色变化 + 下划线展开动画）等
    - **面板/容器类**（9 个）：拖拽提示、配置区块、性能提示框、预览容器等
    - **图标/SVG/箭头类**（3 个）：折叠箭头旋转、帮助图标缩放等
    - **其他**（6 个）：隐藏文本、颜色预览、序列项、指标项、可折叠标题等
@@ -685,4 +693,4 @@ CardScroller/
 
 ---
 
-**CardScroller** - 让滚动视频制作变得简单！让开发者头发掉的更快！
+**CardScroller** - 让滚动视频制作变得简单！让开发者头发掉得更快！
