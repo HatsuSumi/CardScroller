@@ -1,0 +1,2070 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CardScroller - 滚动视频制作工具</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="images/favicon/favicon-32x32.png">
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- Prism.js 代码高亮 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+    
+    <!-- ECharts 数据可视化 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    
+</head>
+<body>
+    <!-- SVG Sprite 定义 -->
+    <svg class="svg-icon-defs hidden" aria-hidden="true">
+        <symbol id="icon-copy" viewBox="0 0 24 24">
+            <path d="M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1ZM19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5ZM19 21H8V7H19V21Z" fill="currentColor"/>
+        </symbol>
+    </svg>
+    
+    <div class="app-container">
+        <!-- 主显示区域 -->
+        <main id="mainDisplay" class="main-display">
+            <div class="empty-state">
+                <div class="welcome-container">
+                    <div class="welcome-icon">
+                        📸
+                    </div>
+                    <h1 class="welcome-title">CardScroller</h1>
+                    <h2 class="welcome-subtitle">滚动视频制作工具</h2>
+                    <p class="welcome-description">
+                        请在右侧控制面板上传图片开始制作。
+                    </p>
+                </div>
+                
+                <div class="info-cards">
+                    <div class="info-card">
+                        <div class="card-icon">📁</div>
+                        <div class="card-content">
+                            <h3>支持格式</h3>
+                            <p>JPEG、PNG、WebP、GIF、BMP</p>
+                        </div>
+                    </div>
+                    
+                    <div class="info-card">
+                        <div class="card-icon">💾</div>
+                        <div class="card-content">
+                            <h3>图片尺寸</h3>
+                            <p>代码逻辑无上限，实际受浏览器限制<span class="tooltip-trigger" data-tooltip="浏览器可上传图片最大尺寸：&#10;Chrome/Edge: 约 65,535×65,535 像素。&#10;Firefox: 约 32,767×32,767 像素。&#10;Safari: 约 4,096×4,096 像素（较低）。&#10;&#10;超过限制会导致图片加载失败。">ⓘ</span>和设备可用内存限制<span class="tooltip-trigger" data-tooltip="图片内存占用计算：&#10;宽度 × 高度 × 4 字节（RGBA每通道1字节）。&#10;&#10;示例：&#10;40,000×4,000 像素 ≈ 610 MB。&#10;60,000×5,000 像素 ≈ 1.12 GB。&#10;&#10;技术说明：&#10;图片加载后会占用内存：&#10;1. 原始压缩文件（JPEG/PNG，通常几MB）。&#10;2. 解码后的位图（CPU内存，宽×高×4字节）。&#10;3. GPU纹理（如启用硬件加速，可能占用额外显存）。&#10;&#10;浏览器优化策略：&#10;缓存复用、延迟解码、纹理合并、视口外缩略。&#10;&#10;注意：大图片内存占用接近理论值。&#10;内存不足会导致浏览器崩溃或卡顿。">ⓘ</span></p>
+                        </div>
+                    </div>
+
+                    <div class="info-card">
+                        <div class="card-icon">💡</div>
+                        <div class="card-content">
+                            <h3>温馨提示</h3>
+                            <p>图片像素尺寸越大，占用内存越多，性能开销越高。超大图片建议切片后分别上传录制，再用视频编辑软件拼接。</p>
+                        </div>
+                    </div>
+                    
+                    <div class="info-card">
+                        <div class="card-icon">🎬</div>
+                        <div class="card-content">
+                            <h3>使用方式</h3>
+                            <p>上传图片调整参数(建议F11全屏)后录屏即可。</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="drag-hint">
+                    <span class="hint-icon">💡</span>
+                    <span class="hint-text">您也可以直接拖拽图片/配置文件到此区域。</span>
+                </div>
+            </div>
+            
+            <!-- 滚动预览区域（初始隐藏） -->
+            <div class="scroll-preview hidden" id="scrollPreview">
+                <div class="scroll-container" id="scrollContainer">
+                    <!-- 入场动画专用Canvas（viewport尺寸，初始隐藏） -->
+                    <canvas id="entryCanvas" class="hidden"></canvas>
+                    <!-- 滚动动画Canvas（完整图片尺寸，初始显示） -->
+                    <canvas id="scrollCanvas"></canvas>
+                    <img id="mainImage" src="" alt="主图片" class="main-image hidden">
+                </div>
+            </div>
+        </main>
+
+        <!-- 右侧控制面板 -->
+        <aside class="control-panel" id="controlPanel">
+            <div class="panel-header">
+                <h3>控制面板</h3>
+                <button class="collapse-btn" id="collapseBtn">
+                    <span class="collapse-icon">‹</span>
+                </button>
+            </div>
+            
+            <!-- 快捷键提示 -->
+            <div class="shortcut-hint">
+                <span class="hint-icon">⌨️</span>
+                <span class="hint-text">按 <kbd>Ctrl+H</kbd> 或点击 <span class="arrow-hint">‹</span> 折叠侧边栏</span>
+            </div>
+            
+            <!-- 透明度控制 -->
+            <div class="opacity-control">
+                <div class="opacity-label">
+                    <span class="opacity-icon">🔍</span>
+                    <span class="opacity-text">侧边栏透明度</span>
+                    <span class="opacity-value" id="opacityValue">95%</span>
+                </div>
+                <div class="opacity-slider-container">
+                    <input type="range" id="opacitySlider" class="opacity-slider" step="5">
+                    <div class="opacity-tips">
+                        <span class="tip-start">透明</span>
+                        <span class="tip-end">不透明</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 自动隐藏侧边栏（初始隐藏） -->
+            <div class="auto-hide-control hidden">
+                <input type="checkbox" id="autoHideSidebar" class="auto-hide-checkbox">
+                <label for="autoHideSidebar">开始播放自动隐藏侧边栏，延迟</label>
+                <input type="number" id="autoHideDelay" step="0.5" class="delay-input">
+                <span class="unit">秒</span>
+            </div>
+            
+            <!-- 自动重置控制（初始隐藏） -->
+            <div class="auto-reset-control hidden">
+                <input type="checkbox" id="autoResetAfterComplete" class="auto-reset-checkbox">
+                <label for="autoResetAfterComplete">播放完毕后自动重置</label>
+            </div>
+            
+            <div class="panel-content">
+                <!-- 导入区域 -->
+                <div class="import-section">
+                    <button class="btn-import-image" id="importImageBtn">
+                        <span class="btn-icon">📁</span>
+                        上传图片
+                    </button>
+                    <input type="file" id="imageInput" accept="image/*" class="file-input-image hidden">
+                    
+                    <button class="btn-import-config" id="importConfigBtn">
+                        <span class="btn-icon">⚙️</span>
+                        导入配置
+                    </button>
+                    <input type="file" id="configInput" accept=".json" class="file-input-config hidden">
+                    
+                    <!-- 隐藏的替换图片文件输入 -->
+                    <input type="file" id="replaceImageInput" accept="image/*" class="file-input-replace-image hidden">
+                </div>
+
+                <!-- 滚动控制区域（初始隐藏） -->
+                <div class="scroll-controls hidden" id="scrollControls">
+                    <!-- 图片信息显示 -->
+                    <div class="image-info-section">
+                        <h3>图片信息</h3>
+                        <div class="image-info-grid">
+                            <div class="info-item">
+                                <span class="info-label">文件大小:</span>
+                                <span id="imageSize" class="info-value">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">图片尺寸:</span>
+                                <span id="imageDimensions" class="info-value">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">文件格式:</span>
+                                <span id="imageFormat" class="info-value">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">宽高比:</span>
+                                <span id="aspectRatio" class="info-value">-</span>
+                            </div>
+                        </div>
+                        <div class="image-info-actions">
+                            <button type="button" class="btn-view-all-info" id="viewAllInfoBtn">
+                                🔍 查看全部
+                            </button>
+                            <button type="button" class="btn-replace" id="replaceImageBtn">
+                                🔄 替换图片
+                                <span class="tooltip-trigger" data-tooltip="注意：此操作会重置起始位置和结束位置，清空入场动画配置（如果已配置），其他配置保持不变。">ⓘ</span>
+                            </button>
+                        </div>
+                        <div class="info-tip">
+                            <div class="tip-icon">💡</div>
+                            <div class="tip-content">
+                                <span class="help-link" id="homeImageSpecHelpLink" data-tooltip="为什么上传的图片在页面会多露出后面的卡片或卡片显示不完整？"><strong>为什么上传的图片...</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label>滚动范围</label>
+                        <div class="position-control">
+                            <div class="position-item">
+                                <label class="position-label">起始位置</label>
+                                <div class="position-selector">
+                                    <div class="position-display">
+                                        <span id="startPosValue">0</span>px
+                                    </div>
+                                    <div class="position-buttons">
+                                        <button type="button" id="selectStartPos" class="btn-outline">选择</button>
+                                        <button type="button" id="restoreStartPos" class="btn-restore">重置</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="position-item">
+                                <label class="position-label">结束位置</label>
+                                <div class="position-selector">
+                                    <div class="position-display">
+                                        <span id="endPosValue">1000</span>px
+                                    </div>
+                                    <div class="position-buttons">
+                                        <button type="button" id="selectEndPos" class="btn-outline">选择</button>
+                                        <button type="button" id="restoreEndPos" class="btn-restore">重置</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 反向滚动控制 -->
+                        <div class="reverse-scroll-control">
+                            <input type="checkbox" id="reverseScroll" class="reverse-scroll-checkbox">
+                            <label for="reverseScroll">反向滚动（交换起始和结束位置）<span class="tooltip-trigger" data-tooltip="⚠️ 如果启用了入场动画：&#10;&#10;✅ 正确流程：先启用反向滚动，再去编辑器标记卡片（此时编辑器会显示最后几张卡片）。&#10;&#10;❌ 错误流程：先标记卡片，再启用反向滚动（之前标记的卡片会不在显示范围内，需要重新标记）。">ⓘ</span></label>
+                        </div>
+                        
+                        <div class="distance-display">
+                            <div class="info-item">
+                                <span class="info-label">滚动距离:</span>
+                                <span id="scrollDistance" class="info-value distance-value">0</span>px
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label>滚动时长</label>
+                        <div class="duration-control">
+                            <input type="number" id="duration" placeholder="时长">
+                            <span class="duration-unit">秒</span>
+                        </div>
+                        <div class="duration-override-hint" id="durationOverrideHint">
+                            <span class="hint-text">因每次循环时长不同被启用，则这里的时长无效。</span>
+                        </div>
+                        <div class="scroll-speed">
+                        <div class="info-item">
+                            <span class="info-label">每秒滚动:</span>
+                            <span id="scrollSpeed" class="info-value speed-value">0</span>px
+                        </div>
+                        
+                    </div>
+                </div>
+
+                    <div class="control-group">
+                        <label>动画效果<span class="tooltip-trigger" data-tooltip="仅滚动动画生效，入场动画不生效。">ⓘ</span></label>
+                        <div class="animation-strategy-control">
+                            <div class="custom-select" id="animationStrategySelect">
+                                <div class="select-trigger">
+                                    <span class="select-value">线性</span>
+                                    <svg class="select-arrow" width="12" height="8" viewBox="0 0 12 8">
+                                        <path d="M1 1L6 6L11 1" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                </div>
+                                <div class="select-options">
+                                    <!-- 选项将从 defaultState.json 动态生成 -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label>页面背景色</label>
+                        <button type="button" class="background-color-trigger-btn" id="colorPickerTriggerBtn">
+                            <span class="background-color-preview" id="backgroundColorPreview"></span>
+                            <span class="background-color-text" id="backgroundColorText">#ffffff</span>
+                        </button>
+                    </div>
+
+                    <div class="control-group loop-control-group">
+                        <div class="loop-basic-control">
+                            <input type="checkbox" id="loopPlay">
+                            <label for="loopPlay">循环播放</label>
+                        </div>
+                        <button type="button" class="btn-advanced-loop" id="advancedLoopBtn">
+                            ⚙️ 高级循环
+                        </button>
+                    </div>
+
+                    <!-- 循环间隔设置 -->
+                    <div class="loop-interval-control">
+                        <div class="interval-left">
+                            <label>循环间隔：</label>
+                            <input type="number" id="loopInterval" step="100">
+                            <span class="unit">ms</span>
+                        </div>
+                        <button type="button" id="resetLoopInterval" class="btn-restore">重置</button>
+                    </div>
+
+                <div class="control-group progress-controls-group">
+                    <label>进度条控制</label>
+                    <div class="progress-controls-row">
+                        <div class="progress-control-item">
+                            <input type="checkbox" id="hideProgress">
+                            <label for="hideProgress">播放时隐藏</label>
+                        </div>
+                        <div class="progress-control-item">
+                            <input type="checkbox" id="hideProgressOnPause">
+                            <label for="hideProgressOnPause">暂停时隐藏</label>
+                        </div>
+                    </div>
+                    <div class="progress-controls-row">
+                        <div class="progress-control-item">
+                            <input type="checkbox" id="keepProgressOnComplete">
+                            <label for="keepProgressOnComplete">播放完毕不隐藏</label>
+                        </div>
+                    </div>
+                </div>
+
+                    <!-- 播放注意事项提示 -->
+                    <div class="playback-notice">
+                        <span class="notice-icon">⚠️</span>
+                        <span class="notice-text">播放期间请勿改变窗口大小，可能影响动画效果<span class="tooltip-trigger" data-tooltip="改变窗口大小包括全屏/退出全屏（F11）、最大化/还原窗口、拖拽调整窗口尺寸等操作。&#10;&#10;至于为什么在UI界面添加提示文本而不是播放时判断是否按了F11快捷键，是因为浏览器出于安全考虑，JavaScript 无法拦截 F11 等系统级快捷键。">ⓘ</span></span>
+                    </div>
+
+                    <div class="playback-controls">
+                        <button class="btn-success" id="playBtn">▶️ 播放</button>
+                        <button class="btn-warning" id="pauseBtn">⏸️ 暂停</button>
+                        <button class="btn-info" id="resetBtn">🔄 重置</button>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn-export-config" id="exportConfigBtn">
+                            <span class="btn-icon">💾</span>
+                            导出配置
+                        </button>
+                        <button class="btn-info" id="aboutBtn">
+                            <span class="btn-icon">ℹ️</span>
+                            关于
+                        </button>
+                    </div>
+                    
+                    <!-- 更多功能按钮 -->
+                    <button class="btn-more-features" id="moreFeaturesBtn">
+                        <span class="btn-icon">✨</span>
+                        更多功能
+                    </button>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- UX 优化：立即执行脚本，在浏览器渲染前添加初始化类，避免输入框闪烁 -->
+        <script>
+            // 该脚本紧随 controlPanel 元素，立即同步执行，在浏览器渲染前就添加类
+            (function() {
+                const controlPanel = document.getElementById('controlPanel');
+                // Fail Fast: 如果关键元素不存在，立即抛出错误
+                if (!controlPanel) {
+                    throw new Error('Critical UI element not found: #controlPanel. Please check HTML structure.');
+                }
+                controlPanel.classList.add('initializing');
+            })();
+        </script>
+    </div>
+
+    <!-- 加载提示框 -->
+        <div id="loadingDialog" class="loading-dialog hidden">
+            <div class="loading-content">
+                <div class="loading-spinner"></div>
+                <div class="loading-text">图片正在加载.....</div>
+            </div>
+        </div>
+
+    <!-- 自定义警告对话框 -->
+    <div id="customDialog" class="custom-dialog hidden">
+        <div class="dialog-overlay"></div>
+        <div class="dialog-content">
+            <div class="dialog-header">
+                <span class="dialog-icon">⚠️</span>
+                <h3 class="dialog-title">图片分析结果</h3>
+            </div>
+            <div class="dialog-body">
+                <div class="dialog-message" id="dialogMessage">
+                    <!-- 动态内容将在这里显示 -->
+                </div>
+            </div>
+            <div class="dialog-footer">
+                <button id="dialogCancelBtn" class="dialog-btn dialog-btn-cancel hidden">
+                    取消
+                </button>
+                <button id="dialogConfirmBtn" class="dialog-btn dialog-btn-confirm">
+                    确定
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 消息提示容器 -->
+    <div class="message-container"></div>
+
+    <!-- 消息提示模板 -->
+    <template id="messageTemplate">
+        <div class="message">
+            <span class="message-text"></span>
+            <button class="message-close">×</button>
+        </div>
+    </template>
+
+    <!-- 关于模态框 -->
+    <div class="about-modal-overlay" id="aboutModalOverlay">
+        <div class="about-modal-content">
+            <div class="about-modal-header">
+                <h3>关于 CardScroller</h3>
+                <button class="about-modal-close" id="aboutModalClose">&times;</button>
+            </div>
+            <div class="about-modal-body">
+                <div class="about-text">
+                    <p>这是一个免费开源的项目，旨在帮助用户更方便地制作滚动类视频。</p>
+                    <p>正因为本项目免费，所以本身并不赚钱，再加上时间精力成本以及开发者近几年在开发独立游戏，精神状态很差的缘故，因此本项目在未来<span class="highlight-warning">大概率不会进行更新</span>，添加更多新功能(如支持上传多张图片，拼接进行滚动[漫画阅读]，支持竖图上下滚动，支持直接导出为视频<span class="tooltip-trigger" data-tooltip="浏览器原生MediaRecorder API对超大分辨率支持不佳。就算要实现也会考虑配合后端实现。">ⓘ</span>，支持命令模式，命令行输入命令上传配置导出一步到位，支持创建画布，直接添加/编辑卡片，可导入.csv/.json文件批量生成卡片，支持自定义卡片排序规则<span class="tooltip-trigger" data-tooltip="即可按照票数、序号、生日、年龄等任何数字字段进行升序/降序。">ⓘ</span>，新增桌面应用)，有能力的可以选择赞助开发者(完全自愿)，感谢您的支持！</p>
+                    <p>你可能经常听到"谁不是为了赚钱而工作？"这句话，但我就是个反例，市面上还有很多其他开源免费的项目，这个项目只是冰山一角而已，其他开发者开源免费也一定有他们的原因。但是请不要误以为每位开发者都是有钱人。</p>
+                    <p>本项目共由一人<span class="tooltip-trigger" data-tooltip="一人包揽架构设计、前端、UI/UX、测试，本项目不含后端，也无需运维。">ⓘ</span>完成开发，从新建文件夹到首次上线共耗时两位数天(每天10-12小时，居家开发，没有工作，<span class="hidden-text">即没有收入</span>)。</p>
+                    <p><span class="hidden-text">唉，在只有时间的情况下，一个人是不可能做出团队规模的项目的~</span></p>
+                    <p>如果在使用过程中发现间歇性Bug<span class="tooltip-trigger" data-tooltip="间歇性Bug：有时出现、有时不出现的Bug，难以稳定复现。">ⓘ</span>，建议直接刷新页面，这类Bug不好测试，多半是竞态条件（Race Condition）<span class="tooltip-trigger" data-tooltip="竞态条件：多个操作的执行顺序或时机不确定，导致结果不可预测。">ⓘ</span>造成的。</p>
+                </div>
+                <div class="contact-item">
+                    <span class="contact-text">如有任何建议、意见、问题，或是想说句鼓励的话，都欢迎发邮件至：<span id="contactEmail"></span></span>
+                    <button class="contact-item-copy-btn" id="copyEmailBtn">
+                        <svg width="16" height="16">
+                            <use href="#icon-copy"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="donation-section">
+                    <h4>赞助支持</h4>
+                    <div class="qr-codes">
+                        <div class="qr-code-item">
+                            <img src="images/support/wechat-pay.png" alt="微信收款码" class="qr-code" onerror="this.style.display='none'; this.nextElementSibling.textContent='微信支付码暂未设置';">
+                            <span class="qr-label">微信支付</span>
+                        </div>
+                        <div class="qr-code-item">
+                            <img src="images/support/alipay.png" alt="支付宝收款码" class="qr-code" onerror="this.style.display='none'; this.nextElementSibling.textContent='支付宝码暂未设置';">
+                            <span class="qr-label">支付宝</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片信息模态框 -->
+    <div class="image-info-modal-overlay" id="imageInfoModalOverlay">
+        <div class="image-info-modal-content">
+            <div class="image-info-modal-header">
+                <h3>📊 图片详细信息</h3>
+                <button class="image-info-modal-close" id="imageInfoModalClose">×</button>
+            </div>
+            <div class="image-info-modal-body">
+                <div class="image-info-content">
+                    <!-- 基本信息 -->
+                    <div class="info-section">
+                        <h4>📋 基本信息</h4>
+                        <div class="info-grid">
+                            <div class="info-row">
+                                <span class="info-label">文件名:</span>
+                                <span class="info-value" id="detailFileName">-</span>
+                            </div>
+                            <div class="info-row info-row-original-size hidden" id="originalFileSizeRow">
+                                <span class="info-label">原始文件大小:</span>
+                                <span class="info-value" id="detailOriginalFileSize">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label" id="fileSizeLabel">采样后文件大小:</span>
+                                <span class="info-value" id="detailFileSize">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">文件格式:</span>
+                                <span class="info-value" id="detailFileFormat">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">最后修改:</span>
+                                <span class="info-value" id="detailLastModified">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 尺寸信息 -->
+                    <div class="info-section">
+                        <h4>📐 尺寸信息</h4>
+                        <div class="info-grid">
+                            <div class="info-row">
+                                <span class="info-label">原始图片尺寸:</span>
+                                <span class="info-value" id="detailOriginalDimensions">-</span>
+                            </div>
+                            <div class="info-row info-row-downsampled-dimensions hidden" id="downsampledDimensionsRow">
+                                <span class="info-label">采样后尺寸 <span class="tooltip-trigger" data-tooltip="降采样：为提升性能，将超大图片缩小到合适尺寸。&#10;原因：超过100MP（百万像素）的图片会导致浏览器渲染缓慢。&#10;放心：只影响程序内部显示，不会修改您的原始图片文件。">ⓘ</span>:</span>
+                                <span class="info-value" id="detailDownsampledDimensions">-</span>
+                            </div>
+                            <div class="info-row" id="actualDimensionsRow">
+                                <span class="info-label">实际图片尺寸:</span>
+                                <span class="info-value" id="detailActualDimensions">-</span>
+                            </div>
+                            <div class="info-tip" id="actualDimensionsTip">
+                                <div class="tip-icon">💡</div>
+                                <div class="tip-content">
+                                    <strong>什么是实际图片尺寸？</strong><br>
+                                    这是图片在您当前浏览器中实际显示的像素大小，受以下因素影响：<br>
+                                    1. 浏览器窗口大小：<span id="viewportSize">-</span><br>
+                                    2. 图片高度超过视口高度时的自动等比例缩放。<br>
+                                    <em id="calculationExample">计算示例：原图 40542×4500 → 实际显示 12181×1352 → 缩放了30%</em>
+                                </div>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">宽高比:</span>
+                                <span class="info-value" id="detailAspectRatio">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">PPI X轴(像素密度) <span class="tooltip-trigger" data-tooltip="PPI (Pixels Per Inch)：每英寸包含的像素数量。&#10;常见值：72 PPI（屏幕标准）、300 PPI（印刷标准）。&#10;PPI越高，图片越清晰。">ⓘ</span>:</span>
+                                <span class="info-value" id="detailPPIX">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">PPI Y轴(像素密度) <span class="tooltip-trigger" data-tooltip="PPI (Pixels Per Inch)：每英寸包含的像素数量。&#10;常见值：72 PPI（屏幕标准）、300 PPI（印刷标准）。&#10;PPI越高，图片越清晰。">ⓘ</span>:</span>
+                                <span class="info-value" id="detailPPIY">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label" id="pixelCountLabel">像素总数:</span>
+                                <span class="info-value" id="detailPixelCount">-</span>
+                            </div>
+                            <div class="info-row info-row-downsampled-pixels hidden" id="downsampledPixelCountRow">
+                                <span class="info-label">采样后像素总数:</span>
+                                <span class="info-value" id="detailDownsampledPixelCount">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label" id="mpLabel">MP(百万像素):</span>
+                                <span class="info-value" id="detailMP">-</span>
+                            </div>
+                            <div class="info-row info-row-downsampled-mp hidden" id="downsampledMPRow">
+                                <span class="info-label">采样后MP(百万像素):</span>
+                                <span class="info-value" id="detailDownsampledMP">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                
+                <!-- 环境限制提示 -->
+                <div class="info-limitation-tip">
+                    <div class="tip-icon">⚠️</div>
+                    <div class="tip-content">
+                        <strong>环境限制说明</strong><br>
+                        浏览器环境可获取的图片信息有限，在其他环境中(如桌面应用)则可以获取更多信息，如图片路径、文件权限、颜色配置文件、图层信息、编辑历史、制作软件信息等数据。
+                    </div>
+                </div>
+            </div>
+            <div class="image-info-modal-footer">
+                <button type="button" class="image-info-modal-btn-close" id="closeImageInfoModal">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 位置选择模态框 -->
+        <div id="positionModal" class="position-modal">
+            <div class="position-backdrop"></div>
+            <div class="position-modal-content">
+                <div class="position-modal-header">
+                    <h3 id="modalTitle">选择起始位置</h3>
+                    <button type="button" id="closeModal" class="position-modal-close">×</button>
+                </div>
+                <div class="position-modal-body">
+                    <div class="preview-container">
+                        <div class="preview-viewport">
+                            <img id="modalImage" src="" alt="预览图片">
+                        </div>
+                    </div>
+                    <div class="position-slider-container">
+                        <div class="slider-tips">
+                            <span class="tip-text">💡 蓝色边框表示显示窗口，拖动滑块预览滚动到该位置时的画面内容</span>
+                        </div>
+                        <input type="range" id="positionSlider" min="0" max="1000" value="0" class="position-slider">
+                        <div class="slider-info">
+                            <span class="slider-label">拖动滑块选择位置，或用 ← → 箭头键微调（Shift+箭头10px）</span>
+                            <span id="currentPosition" class="current-position">0px</span>
+                        </div>
+                        <div class="position-lock-option">
+                            <label class="position-lock-label">
+                                <input type="checkbox" id="lockToImageEndCheckbox" class="position-lock-checkbox">
+                                <span class="position-lock-text">锁定到图片末尾<span class="tooltip-trigger" data-tooltip-html="勾选后，窗口大小变化时会自动调整结束位置<span class='tooltip-trigger' data-tooltip-html='因为窗口大小变化会导致图片缩放比例变化，进而导致图片显示宽度变化。<br><br>结束位置的计算公式是：图片显示宽度 - 窗口宽度，所以必须重新计算才能保证视口右边界始终贴合图片右边界。<br><br>这是本项目唯一一处嵌套提示框（Tooltip）。'>ⓘ</span>，确保视口右边界始终贴合图片右边界。取消勾选后，结束位置将保持为当前设置的固定像素值。">ⓘ</span></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="position-modal-footer">
+                    <button type="button" id="cancelPosition" class="position-modal-btn-cancel">取消</button>
+                    <button type="button" id="confirmPosition" class="position-modal-btn-confirm">确认</button>
+                </div>
+            </div>
+        </div>
+
+    <!-- 视口边界指示器模板 -->
+    <template id="viewportIndicatorTemplate">
+        <div class="viewport-indicator"></div>
+    </template>
+
+    <!-- 循环次数选项模板 -->
+    <template id="loopCountOptionTemplate">
+        <div class="select-option" data-value="">
+            <span class="option-text"></span>
+        </div>
+    </template>
+
+    <!-- 动画策略选项模板 -->
+    <template id="animationStrategyOptionTemplate">
+        <div class="select-option" data-value="">
+            <span class="option-label"></span>
+            <span class="option-description"></span>
+        </div>
+    </template>
+
+    <!-- 播放进度条 -->
+    <div id="progressContainer" class="progress-container hidden">
+        <div class="progress-info">
+            <span id="progressTime" class="progress-time">00:00.00 / 00:00.00</span>
+            <span id="progressDistance" class="progress-distance">当前已移动0px</span>
+            <span id="progressLoop" class="progress-loop hidden"></span>
+            <span id="progressTotalTime" class="progress-total-time hidden"></span>
+            <span id="progressCountdown" class="progress-countdown hidden">距离下一次循环还有0.0秒</span>
+        </div>
+        <div class="progress-bar-wrapper">
+            <div id="progressBar" class="progress-bar">
+                <div id="progressFill" class="progress-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 高级循环设置模态框 -->
+    <div id="advancedLoopModal" class="advanced-loop-modal-overlay">
+        <div class="advanced-loop-modal-content">
+            <div class="advanced-loop-modal-header">
+                <h3>高级循环设置</h3>
+                <button class="advanced-loop-modal-close" id="advancedLoopModalClose">&times;</button>
+            </div>
+            
+            <div class="advanced-loop-modal-body">
+                <div class="advanced-loop-settings">
+                        <div class="control-subgroup">
+                            <label>循环次数</label>
+                            <div class="loop-count-control">
+                                <div class="custom-select" id="loopCountSelect">
+                                    <div class="select-trigger">
+                                        <span class="select-value">无限循环</span>
+                                        <div class="select-arrow">▼</div>
+                                    </div>
+                                    <div class="select-options">
+                                        <!-- 选项将从 defaultState.json 动态生成 -->
+                                    </div>
+                                </div>
+                                <input type="number" id="customLoopCount" class="custom-input hidden">
+                            </div>
+                        </div>
+                    
+                    <div class="control-subgroup">
+                        <label>
+                            <input type="checkbox" id="variableDuration"> 
+                            每次循环时长不同(无限循环和一次循环不适用)<span class="tooltip-trigger" data-tooltip="变长时长仅对滚动动画有效，入场动画时长在每次循环中保持不变。">ⓘ</span>
+                        </label>
+                    </div>
+                    
+                        <div class="duration-pattern-control hidden" id="durationPatternControl">
+                            <div class="duration-sequence-header">
+                                <span class="sequence-label">时长序列：</span>
+                            </div>
+                            <div class="duration-sequence-list" id="durationSequenceList">
+                                <!-- 动态生成的时长输入项 -->
+                            </div>
+                        </div>
+                        
+                        <!-- 时长序列项目模板 -->
+                        <template id="durationSequenceItemTemplate">
+                            <div class="duration-sequence-item">
+                                <span class="sequence-item-label"></span>
+                                <div class="sequence-item-input">
+                                    <input type="number" min="1" step="0.1">
+                                    <span class="unit">秒</span>
+                                </div>
+                                <div class="sequence-item-error">
+                                    <span class="error-text error-empty">时长不能为空。</span>
+                                    <span class="error-text error-min">时长不能小于1秒。</span>
+                                </div>
+                            </div>
+                        </template>
+                </div>
+            </div>
+            
+            <div class="advanced-loop-modal-footer">
+                <button type="button" class="advanced-loop-modal-btn-cancel" id="advancedLoopModalCancel">取消</button>
+                <button type="button" class="advanced-loop-modal-btn-confirm" id="advancedLoopModalConfirm">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 颜色选择器模态框 -->
+    <div id="colorPickerModal" class="color-picker-modal-overlay">
+        <div class="color-picker-modal-content">
+            <div class="color-picker-modal-header">
+                <h3>🎨 选择背景颜色</h3>
+                <button class="color-picker-modal-close">&times;</button>
+            </div>
+            
+            <div class="color-picker-modal-body">
+                <div class="color-picker-modal-container">
+                    <!-- Canvas 颜色选择器区域 -->
+                    <div class="color-picker-canvas-area">
+                        <!-- 饱和度-明度选择器 -->
+                        <canvas class="color-picker-sv-canvas" width="280" height="200"></canvas>
+                        <!-- 色相选择器 -->
+                        <canvas class="color-picker-hue-canvas" width="30" height="200"></canvas>
+                    </div>
+
+                    <!-- 当前颜色显示 + 多格式显示 -->
+                    <div class="color-picker-current-area">
+                        <div class="color-picker-current-color-display">
+                            <div class="color-picker-current-color"></div>
+                            <label>当前颜色</label>
+                        </div>
+                        <div class="color-picker-values-group">
+                            <div class="color-picker-value-row">
+                                <label>Hex:</label>
+                                <div class="color-picker-hex-group">
+                                    <input type="text" class="color-picker-hex-input" id="colorPickerHexInput" placeholder="#FFFFFF" maxlength="7">
+                                    <button type="button" class="color-picker-eyedropper-btn" id="colorPickerEyedropperBtn">拾色器</button>
+                                </div>
+                            </div>
+                            <div class="color-picker-value-row">
+                                <label>RGB:</label>
+                                <div class="color-picker-value-inputs">
+                                    <div class="color-picker-value-input-group">
+                                        <span class="color-picker-value-label">R</span>
+                                        <input type="number" class="color-picker-number-input" id="colorPickerRInput" min="0" max="255" placeholder="255">
+                                    </div>
+                                    <div class="color-picker-value-input-group">
+                                        <span class="color-picker-value-label">G</span>
+                                        <input type="number" class="color-picker-number-input" id="colorPickerGInput" min="0" max="255" placeholder="255">
+                                    </div>
+                                    <div class="color-picker-value-input-group">
+                                        <span class="color-picker-value-label">B</span>
+                                        <input type="number" class="color-picker-number-input" id="colorPickerBInput" min="0" max="255" placeholder="255">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="color-picker-value-row">
+                                <label>HSV:</label>
+                                <div class="color-picker-value-inputs">
+                                    <div class="color-picker-value-input-group">
+                                        <span class="color-picker-value-label">H</span>
+                                        <input type="number" class="color-picker-number-input" id="colorPickerHInput" min="0" max="359" placeholder="0">
+                                        <span class="color-picker-value-unit">°</span>
+                                    </div>
+                                    <div class="color-picker-value-input-group">
+                                        <span class="color-picker-value-label">S</span>
+                                        <input type="number" class="color-picker-number-input" id="colorPickerSInput" min="0" max="100" placeholder="0">
+                                        <span class="color-picker-value-unit">%</span>
+                                    </div>
+                                    <div class="color-picker-value-input-group">
+                                        <span class="color-picker-value-label">V</span>
+                                        <input type="number" class="color-picker-number-input" id="colorPickerVInput" min="0" max="100" placeholder="100">
+                                        <span class="color-picker-value-unit">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 固定预设颜色：灰度系列 -->
+                    <div class="color-picker-presets-section">
+                        <div class="color-picker-presets-label">灰度系列</div>
+                        <div class="color-picker-preset-gray"></div>
+                    </div>
+
+                    <!-- 固定预设颜色：常用色彩 -->
+                    <div class="color-picker-presets-section">
+                        <div class="color-picker-presets-label">常用色彩</div>
+                        <div class="color-picker-preset-row1"></div>
+                        <div class="color-picker-preset-row2"></div>
+                    </div>
+
+                    <!-- 自定义预设颜色 -->
+                    <div class="color-picker-custom-section">
+                        <div class="color-picker-custom-header">
+                            <span class="color-picker-presets-label">自定义预设</span>
+                            <button class="color-picker-add-preset-btn">+ 保存当前颜色</button>
+                        </div>
+                        <div class="color-picker-custom-presets"></div>
+                        <div class="color-picker-custom-hint">
+                            📄 最多保存10个预设颜色。使用 LocalStorage 保存在浏览器本地，清除浏览器数据或更换设备后会丢失。
+                        </div>
+                    </div>
+
+                    <!-- 提示信息 -->
+                    <div class="color-picker-hint">
+                        💡 <strong>背景颜色说明：</strong>普通的滚动动画无实际作用，仅在有卡片入场动画需求时才有实际作用，详情可参考“更多功能 → 卡片入场动画”的说明。
+                    </div>
+                    
+                    <!-- 拾色器功能说明 -->
+                    <div class="color-picker-hint">
+                        <strong>拾色器功能（EyeDropper API）：</strong>点击 Hex 输入框旁边的“拾色器”按钮可从页面任意位置吸取颜色（包括上传的图片）。支持 Chrome 95+、Edge 95+、Opera 81+ 浏览器。
+                    </div>
+                    
+                    <!-- 彩蛋吐槽 -->
+                    <div class="color-picker-hint color-picker-hint-easter-egg">
+                        🤔 开发者：浏览器原生的 &lt;input type="color"&gt;<span class="tooltip-trigger" data-tooltip="浏览器原生颜色选择器：HTML5 提供的 <input type=&quot;color&quot;> 元素，点击后会弹出系统默认的颜色选择器。功能简单但样式和交互无法自定义，无法保存预设颜色，也不支持 RGB/HSV 输入。">ⓘ</span>？不存在的，我选择重造轮子！
+                    </div>
+                </div>
+            </div>
+            
+            <div class="color-picker-modal-footer">
+                <button type="button" class="color-picker-modal-btn-cancel" id="colorPickerCancelBtn">取消</button>
+                <button type="button" class="color-picker-modal-btn-confirm" id="colorPickerConfirmBtn">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 气泡菜单 -->
+    <div id="bubbleMenu" class="bubble-menu">
+        <div class="bubble-menu-overlay"></div>
+        <div class="decorative-bubbles" id="decorativeBubbles">
+            <canvas id="decorativeBubblesCanvas"></canvas>
+        </div>
+        <div class="bubble-container" id="bubbleContainer">
+            <!-- 气泡将从模板动态生成 -->
+        </div>
+    </div>
+
+    <!-- 功能配置页面 -->
+    <div id="featureConfigPage" class="feature-config-page hidden">
+        <div class="config-page-overlay"></div>
+        <div class="config-page-transition"></div>
+        
+        <!-- 右侧导航栏 -->
+        <nav class="config-page-nav" id="configPageNav">
+            <button class="config-nav-item" data-page-id="home">
+                <span class="nav-label">首页</span>
+            </button>
+            <button class="config-nav-item" data-page-id="entry-animation">
+                <span class="nav-label">入场动画</span>
+                <span class="nav-shortcut">Ctrl+E</span>
+            </button>
+            <button class="config-nav-item" data-page-id="performance-monitor">
+                <span class="nav-label">性能监控</span>
+                <span class="nav-shortcut">Ctrl+M</span>
+            </button>
+        </nav>
+        
+        <div class="config-page-content">
+            <div class="config-page-wrapper">
+                <div class="config-page-header">
+                    <h2 class="config-page-title" id="configPageTitle">功能配置</h2>
+                </div>
+                <div class="config-page-body" id="configPageBody">
+                    <!-- 配置内容将由ConfigPage服务动态渲染 -->
+                </div>
+                <div class="config-page-footer">
+                    <button class="page-btn-cancel" id="configCancelBtn">返回首页</button>
+                    <button class="page-btn-confirm" id="configConfirmBtn">确认配置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Templates -->
+    <template id="downloadLinkTemplate">
+        <a></a>
+    </template>
+    
+    <template id="bubbleItemTemplate">
+        <div class="bubble-item">
+            <div class="bubble-title"></div>
+        </div>
+    </template>
+    
+    <template id="cardAnimationItemTemplate">
+        <div class="card-animation-item">
+            <label class="config-label-main"></label>
+            <div class="custom-select">
+                <div class="select-trigger">
+                    <span class="select-value"></span>
+                    <svg class="select-arrow" width="12" height="8" viewBox="0 0 12 8">
+                        <path d="M1 1L6 6L11 1" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="select-options"></div>
+            </div>
+        </div>
+    </template>
+    
+    <template id="selectOptionTemplate">
+        <div class="select-option">
+            <span class="option-text"></span>
+        </div>
+    </template>
+    
+    <template id="tempCanvasTemplate">
+        <canvas class="temp-canvas"></canvas>
+    </template>
+    
+    <template id="cardPositionInfoItemTemplate">
+        <div class="card-position-info-item">
+            <span class="card-position-label"></span>
+            <div class="card-position-boundaries">
+                <span class="boundary-bracket">[</span>
+                <span class="boundary-value boundary-left"></span>
+                <span class="boundary-unit">px</span>
+                <span class="boundary-separator">,</span>
+                <span class="boundary-value boundary-right"></span>
+                <span class="boundary-unit">px</span>
+                <span class="boundary-bracket">]</span>
+            </div>
+        </div>
+    </template>
+
+    <template id="entryAnimationConfigTemplate">
+        <div class="entry-animation-config">
+            <!-- 启用开关 -->
+            <div class="config-section">
+                <div class="config-item">
+                    <label class="config-label">
+                        <input type="checkbox" id="entryAnimationEnabled" class="config-checkbox">
+                        <span class="config-label-text">启用卡片入场动画</span>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- 其他配置项容器（启用时显示） -->
+            <div class="entry-animation-fields" id="entryAnimationFields">
+                <!-- 左侧：卡片位置编辑器 -->
+                <div class="config-column config-column-left">
+                    <div class="config-section">
+                        <h3 class="config-section-title">卡片位置配置</h3>
+                        <p class="config-section-note config-section-info">
+                            💡 请确保边界线完美对齐卡片边缘，否则入场动画结束时可能出现轻微跳变。
+                        </p>
+                        <div class="card-boundary-editor-container">
+                            <canvas id="cardBoundaryCanvas" class="card-boundary-canvas"></canvas>
+                            <div class="card-boundary-hint">
+                                点击图片添加竖线标记卡片边界，拖动调整位置，右键删除。选中边界线后可用 ← → 箭头键微调（Shift+箭头10px），仅显示起始位置的可视区域。<span class="boundary-help-link" id="boundaryHelpLink">什么是边界线？</span>
+                            </div>
+                            <div class="card-boundary-footer">
+                                <div class="card-boundary-status" id="cardBoundaryStatus">未标记卡片</div>
+                                <button class="card-boundary-clear-btn" id="cardBoundaryClearBtn">清空边界线</button>
+                            </div>
+                            <div class="card-boundary-help-section">
+                                <span class="card-boundary-help-link" id="imageSpecHelpLink">为什么上传的图片在页面会多露出后面的卡片或卡片显示不完整？</span>
+                                <span class="card-boundary-help-separator"> | </span>
+                                <span class="card-boundary-help-link" id="verticalBoundaryHelpLink">为什么只需要添加竖线不需要添加横线？</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 快速恢复边界线 -->
+                    <div class="config-section card-boundary-restore-section">
+                        <h3 class="config-section-title">快速恢复边界线<span class="tooltip-trigger" data-tooltip="注意：同一张图片，降采样和没降采样的边界线数组是不一致的。">ⓘ</span></h3>
+                        <p class="config-section-note config-section-info">
+                            💡 第一次使用时可在右侧“卡片位置信息”下方复制边界线数组并保存，下次直接粘贴恢复，避免手动拖线标记。
+                        </p>
+                        <div class="boundary-restore-input-group">
+                            <input 
+                                type="text" 
+                                id="cardBoundaryRestoreInput" 
+                                class="boundary-restore-input" 
+                                placeholder="粘贴边界线数组，例如：[28,1844,2065,3881,4102,5918,6139,7955]"
+                            >
+                            <button class="btn-apply boundary-restore-btn" id="cardBoundaryRestoreBtn">
+                                <span class="btn-text">应用</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 入场动画预览区域 -->
+                    <div class="config-section entry-animation-preview-section">
+                        <h3 class="config-section-title">动画预览</h3>
+                        <div class="preview-canvas-container">
+                            <canvas id="entryAnimationPreviewCanvas" class="entry-animation-preview-canvas"></canvas>
+                            <div class="preview-overlay">
+                                <button class="preview-btn" id="entryAnimationPreviewBtn">
+                                    <span class="preview-btn-icon">▶</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 性能提示 -->
+                    <div class="config-section entry-animation-performance-hint-section">
+                        <div class="performance-hint-box">
+                            <div class="performance-hint-icon">⚠️</div>
+                            <div class="performance-hint-content">
+                                <h4 class="performance-hint-title">性能提示</h4>
+                                 <p class="performance-hint-text">
+                                     卡片入场动画功能性能开销非常大，代码层面已经全面优化过了，具体优化项：
+                                 </p>
+                                 <div class="performance-optimizations-wrapper" id="performanceOptimizationsWrapper">
+                                     <div class="performance-optimizations-list" id="performanceOptimizationsList">
+                                        1. 独立Canvas架构：入场动画使用独立viewport尺寸Canvas，滚动动画使用完整尺寸Canvas<br>
+                                        2. Viewport裁剪：入场动画仅渲染可见区域，大幅减少Canvas物理像素<br>
+                                        3. 预先缩放图片到离屏Canvas，避免每帧实时缩放<br>
+                                        4. 预先裁剪每张卡片到独立离屏Canvas，避免每帧裁剪<br>
+                                        5. 智能状态管理：简单动画手动管理透明度，复杂动画（旋转/模糊）才使用save/restore<br>
+                                        6. 使用WeakMap缓存Canvas 2D上下文，避免重复getContext调用<br>
+                                        7. 缓存背景色，避免每帧从状态管理器读取<br>
+                                        8. 缓存动画策略实例，避免每帧查找策略<br>
+                                        9. 缓存Canvas信息对象，避免每帧重复创建<br>
+                                        10. 复用事件数据对象，避免每帧创建新对象<br>
+                                        11. 使用传统for循环代替forEach，减少函数调用开销<br>
+                                        12. cardInfo对象池化，避免每帧为每张卡片创建新对象<br>
+                                        13. 合并clear和fillRect操作，减少Canvas API调用次数<br>
+                                        <span class="optimization-not-implemented">❌ 未优化：WebGL硬件加速渲染（目前使用Canvas 2D API）</span>
+                                    </div>
+                                     <div class="performance-optimizations-fade" id="performanceOptimizationsFade">
+                                         <div class="performance-hint-toggle" id="performanceOptimizationsToggle">
+                                             <svg class="performance-hint-toggle-arrow" width="24" height="12" viewBox="0 0 24 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                 <path d="M2 2L12 10L22 2" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                             </svg>
+                                         </div>
+                                     </div>
+                                 </div>
+                                 <p class="performance-hint-advice">
+                                     如果您的设备在使用过程中仍感觉卡顿、掉帧、不流畅、有延迟，那么建议在PPT中制作入场动画，然后再配合该工具的滚动动画进行视频剪辑。
+                                 </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 放大镜Canvas（浮动在右侧配置项上方） -->
+                    <canvas id="cardBoundaryMagnifier" class="card-boundary-magnifier"></canvas>
+                </div>
+                
+                <!-- 右侧：其他配置项 -->
+                <div class="config-column config-column-right">
+                    <!-- 卡片动画类型列表（动态生成） -->
+                    <div class="config-section" id="cardAnimationsSection">
+                        <h3 class="config-section-title">卡片动画效果<span class="tooltip-trigger" data-tooltip="如果感觉动画太快，可以调整下方的'单张卡片动画时长'，每种动画合适的时长不同。">ⓘ</span></h3>
+                        <p class="config-section-note" id="cardAnimationsHint">💡 提示：左键点击选项应用到当前卡片，右键点击选项应用到所有卡片。</p>
+                        <div id="cardAnimationsList" class="card-animations-list">
+                            <!-- 动态生成 -->
+                        </div>
+                    </div>
+                    
+                    <!-- 动画参数 -->
+                    <div class="config-section">
+                        <h3 class="config-section-title">动画参数</h3>
+                        <p class="config-section-note">
+                            💡 大部分动画效果为线性（10种），少数动画（5种）使用预设缓动效果<span class="tooltip-trigger" data-tooltip-html="水平翻转、垂直翻转（余弦缓动）<br>弹跳入场（弹跳缓动）<br>摇摆（正弦衰减）<br>碎片重组（三次方缓出）">ⓘ</span>，动画缓动参数无法配置。
+                        </p>
+                        <p class="config-section-note config-section-warning">
+                            ⚠️ 背景色说明：如果您的图片中卡片之间有背景色（如黑色），请在主界面控制面板的"页面背景色"设置为相同颜色，否则入场动画时卡片间隙会露出白色背景导致穿帮。仅支持纯色，不支持渐变色/图案。请确保原图也是纯色背景。
+                        </p>
+                        <div class="config-item">
+                            <label class="config-label-main" for="entryAnimationDuration">
+                                <span class="config-label-text">单张卡片动画时长</span>
+                            </label>
+                            <div class="config-input-group">
+                                <input type="number" id="entryAnimationDuration" class="config-input" min="1" max="5000" step="50" value="1000">
+                                <span class="config-unit">毫秒</span>
+                            </div>
+                        </div>
+                        <div class="config-item">
+                            <label class="config-label-main" for="entryAnimationStaggerDelay">
+                                <span class="config-label-text">卡片间隔延迟</span>
+                            </label>
+                            <div class="config-input-group">
+                                <input type="number" id="entryAnimationStaggerDelay" class="config-input" min="0" max="2000" step="50" value="500">
+                                <span class="config-unit">毫秒</span>
+                            </div>
+                        </div>
+                        <div class="config-item">
+                            <label class="config-label-main" for="entryAnimationIntervalBeforeScroll">
+                                <span class="config-label-text">入场动画执行完毕后，等待多少毫秒再开始滚动动画</span>
+                            </label>
+                            <div class="config-input-group">
+                                <input type="number" id="entryAnimationIntervalBeforeScroll" class="config-input" min="0" max="5000" step="50" value="500">
+                                <span class="config-unit">毫秒</span>
+                            </div>
+                        </div>
+                        <div class="config-item total-duration-display">
+                            <div class="total-duration-info">
+                                <div class="total-duration-label">预计动画总时长</div>
+                                <div class="total-duration-hint">仅入场动画总时长，不包含滚动动画总时长。</div>
+                            </div>
+                            <div class="total-duration-value" id="entryAnimationTotalDuration">-</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 卡片位置信息 -->
+                    <div class="config-section card-position-info-section" id="cardPositionInfoSection">
+                        <h3 class="config-section-title">卡片位置信息</h3>
+                        <p class="config-section-note config-section-info">
+                            💡 格式：卡片n：[左边界, 右边界]。<br>
+                            📏 边界值为原图坐标，即从原图左边缘到边界线的距离（单位：px）。<br>
+                            🔄 可通过左侧"快速恢复边界线"输入框粘贴下方数组快速恢复。<br>
+                            💾 边界线数组会自动保存到导出的配置文件中（entryAnimationCardBoundaries字段），丢失后可从中找回。
+                        </p>
+                        
+                        <!-- 空状态提示 -->
+                        <div class="card-position-empty-state" id="cardPositionEmptyState">
+                            <p class="empty-state-text">请先在上方编辑器中标记卡片边界线。</p>
+                            <p class="empty-state-hint">标记完成后点击下方按钮查看卡片位置信息。</p>
+                        </div>
+                        
+                        <!-- 卡片列表 -->
+                        <div class="card-position-info-list" id="cardPositionInfoList">
+                            <!-- 动态生成的卡片位置信息 -->
+                        </div>
+                        
+                        <!-- 刷新按钮 -->
+                        <div class="card-position-actions">
+                            <button class="card-position-refresh-btn" id="cardPositionRefreshBtn">
+                                <span class="btn-icon">🔄</span>
+                                <span class="btn-text">查看卡片位置</span>
+                            </button>
+                        </div>
+                        
+                        <!-- 边界线数组文本 -->
+                        <div class="card-boundaries-array-section hidden" id="cardBoundariesArraySection">
+                            <div class="boundaries-array-label">边界线位置数组（复制保存以便下次快速恢复）：</div>
+                            <div class="boundaries-array-display">
+                                <code class="boundaries-array-code" id="cardBoundariesArrayText">[]</code>
+                                <button class="boundaries-copy-btn" id="cardBoundariesCopyBtn">
+                                    <svg width="16" height="16">
+                                        <use href="#icon-copy"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+    
+    <!-- 模块化架构 -->
+    <script type="module" src="js/CardScrollerApp.js"></script>
+    
+    <!-- 模块加载状态检测 -->
+    <script>
+        setTimeout(() => {
+            if (!window.cardScrollerApp) {
+                console.warn('ES6 modules failed to load, consider using a modern browser');
+            } else {
+                // console.log('✅ CardScroller应用已成功加载 (ES6模块)');
+            }
+        }, 2000); 
+    </script>
+
+    <template id="offscreen-canvas-template">
+        <canvas></canvas>
+    </template>
+
+    <template id="realtime-fps-monitor-template">
+        <div class="realtime-fps-monitor hidden">
+            <span class="realtime-fps-monitor-label">FPS: </span>
+            <span class="realtime-fps-monitor-value">0.0 (平均: 0.0)</span>
+        </div>
+    </template>
+
+    <template id="performance-report-page-template">
+        <div class="performance-report-page">
+            <!-- 监控控制面板 -->
+            <div class="performance-section control-section">
+                <h3 class="performance-section-title">监控控制</h3>
+                <div class="monitor-control-panel">
+                    <div class="control-item">
+                        <label>
+                            <input type="checkbox" id="enableMonitorCheckbox" class="control-checkbox">
+                            <span>开启性能监控</span>
+                        </label>
+                    </div>
+                    <div class="control-item">
+                        <label>
+                            <input type="checkbox" id="showRealtimeFPSCheckbox" class="control-checkbox">
+                            <span>播放时显示FPS</span>
+                        </label>
+                    </div>
+                </div>
+                <p class="info-hint">
+                    ⚠️ 开启性能监控后，建议完整播放动画，中途暂停会影响数据准确性。下一次播放动画会覆盖上一次的报告。性能监控与循环播放不可同时启用。
+                </p>
+            </div>
+            
+            <!-- 设备信息面板 -->
+            <div class="performance-section">
+                <h3 class="performance-section-title">设备信息</h3>
+                <div class="device-info-panel">
+                    <div class="info-item">
+                        <span class="info-label">屏幕分辨率：</span>
+                        <span id="screenResolution" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">视口尺寸：</span>
+                        <span id="viewportSize" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">设备像素比（DPR） <span class="tooltip-trigger" data-tooltip="设备像素比：屏幕物理像素与CSS像素的比例。&#10;&#10;物理像素：屏幕实际的像素点（硬件级别）。&#10;CSS像素：网页布局使用的像素（代码级别）。&#10;&#10;普通屏幕：1个CSS像素 = 1个物理像素（DPR=1）。&#10;高清屏（Retina）：1个CSS像素 = 4个物理像素（DPR=2，2x2网格）。&#10;&#10;DPR越高，显示越清晰细腻，但对性能要求也越高。">ⓘ</span>：</span>
+                        <span id="devicePixelRatio" class="info-value">-</span>
+                    </div>
+                    <div class="info-item refresh-rate-item">
+                        <span class="info-label">刷新率：</span>
+                        <span id="refreshRate" class="info-value">-</span>
+                        <div class="refresh-rate-controls">
+                            <input type="number" id="refreshRateInput" class="info-input" placeholder="手动输入" min="30" max="500" step="1">
+                            <button id="refreshRateConfirmBtn" class="info-button">确认</button>
+                        </div>
+                        <p class="info-hint">💡 如何查看显示器刷新率：<br>
+                            <strong>Windows:</strong> 设置 → 系统 → 显示 → 高级显示设置。<br>
+                            或在PowerShell中运行：</p>
+                        <div class="command-block">
+                            <pre class="command-code" id="windowsRefreshRateCommand"><span class="ps-variable">$info</span> = <span class="ps-cmdlet">Get-CimInstance</span> <span class="ps-param">-ClassName</span> Win32_VideoController <span class="ps-operator">|</span> <span class="ps-cmdlet">Select-Object</span> Name, CurrentRefreshRate
+<span class="ps-cmdlet">Write-Host</span> <span class="ps-string">"当前显示器刷新率："</span> <span class="ps-variable">$info</span>.CurrentRefreshRate <span class="ps-string">"Hz"</span></pre>
+                            <button class="command-copy-btn" data-target="windowsRefreshRateCommand">
+                                <svg width="16" height="16">
+                                    <use href="#icon-copy"/>
+                                </svg>
+                            </button>
+                            <span class="command-hint" data-tooltip-html="<strong>命令解释：</strong><br><br><strong>第一行：</strong><br>Get-CimInstance -ClassName Win32_VideoController<br>&nbsp;&nbsp;→ 查询显卡（视频控制器）的详细信息。<br>&nbsp;&nbsp;→ Win32_VideoController 是 Windows 管理接口中的显卡类。<br><br>| Select-Object Name, CurrentRefreshRate<br>&nbsp;&nbsp;→ 筛选出显卡名称和当前刷新率两个属性。<br>&nbsp;&nbsp;→ 管道符 | 将查询结果传递给下一个命令。<br><br><strong>第二行：</strong><br>Write-Host &quot;当前显示器刷新率：&quot; $info.CurrentRefreshRate &quot;Hz&quot;<br>&nbsp;&nbsp;→ 在控制台输出刷新率信息。<br>&nbsp;&nbsp;→ $info.CurrentRefreshRate 读取刷新率数值。<br><br>💡 <strong>为什么从显卡查询刷新率？</strong><br>刷新率属于'显示配置'而非'显示器硬件属性'：<br>&nbsp;&nbsp;→ 显示器只是'支持'某些刷新率（如60/144/240Hz）。<br>&nbsp;&nbsp;→ 显卡负责'实际输出'当前刷新率给显示器。<br>&nbsp;&nbsp;→ 所以 CurrentRefreshRate 存储在显卡类中。<br>&nbsp;&nbsp;→ 这代表系统当前的实际运行状态。">想了解命令意思？</span>
+                        </div>
+                        <p class="info-hint">或在命令提示符(CMD)中运行：</p>
+                        <div class="command-block">
+                            <pre class="command-code" id="windowsRefreshRateCommandWmic"><span class="cmd-command">wmic</span> path Win32_VideoController get CurrentRefreshRate</pre>
+                            <button class="command-copy-btn" data-target="windowsRefreshRateCommandWmic">
+                                <svg width="16" height="16">
+                                    <use href="#icon-copy"/>
+                                </svg>
+                            </button>
+                            <span class="command-hint" data-tooltip-html="<strong>命令解释：</strong><br><br><strong>wmic</strong><br>&nbsp;&nbsp;→ Windows Management Instrumentation Command-line。<br>&nbsp;&nbsp;→ Windows 管理工具命令行接口。<br><br><strong>path Win32_VideoController</strong><br>&nbsp;&nbsp;→ 指定查询路径为显卡（视频控制器）类。<br>&nbsp;&nbsp;→ Win32_VideoController 包含显卡的所有信息。<br><br><strong>get CurrentRefreshRate</strong><br>&nbsp;&nbsp;→ 获取 CurrentRefreshRate（当前刷新率）属性。<br>&nbsp;&nbsp;→ 直接输出刷新率数值（单位：Hz）。<br><br>💡 <strong>为什么从显卡查询刷新率？</strong><br>刷新率属于'显示配置'而非'显示器硬件属性'：<br>&nbsp;&nbsp;→ 显示器只是'支持'某些刷新率（如60/144/240Hz）。<br>&nbsp;&nbsp;→ 显卡负责'实际输出'当前刷新率给显示器。<br>&nbsp;&nbsp;→ 所以 CurrentRefreshRate 存储在显卡类中。<br>&nbsp;&nbsp;→ 这代表系统当前的实际运行状态。">想了解命令意思？</span>
+                        </div>
+                        <p class="info-hint">
+                            <strong>macOS:</strong> 系统偏好设置 → 显示器 → 刷新率。<br>
+                            或在终端运行：</p>
+                        <div class="command-block">
+                            <pre class="command-code" id="macRefreshRateCommand"><span class="cmd-command">system_profiler</span> SPDisplaysDataType <span class="cmd-operator">|</span> <span class="cmd-command">grep</span> <span class="cmd-string">"Resolution"</span></pre>
+                            <button class="command-copy-btn" data-target="macRefreshRateCommand">
+                                <svg width="16" height="16">
+                                    <use href="#icon-copy"/>
+                                </svg>
+                            </button>
+                            <span class="command-hint" data-tooltip-html="<strong>命令解释：</strong><br><br><strong>system_profiler SPDisplaysDataType</strong><br>&nbsp;&nbsp;→ 查询系统显示器的详细配置信息。<br>&nbsp;&nbsp;→ SPDisplaysDataType 是显示器数据类型。<br><br><strong>| grep 'Resolution'</strong><br>&nbsp;&nbsp;→ 筛选包含 Resolution（分辨率）的行。<br>&nbsp;&nbsp;→ 该行通常包含刷新率信息（如 60.00 Hz）。">想了解命令意思？</span>
+                        </div>
+                        <p class="info-hint"><strong>Linux:</strong> 终端运行：</p>
+                        <div class="command-block">
+                            <pre class="command-code" id="linuxRefreshRateCommand"><span class="cmd-command">xrandr</span> <span class="cmd-operator">|</span> <span class="cmd-command">grep</span> <span class="cmd-string">"*"</span></pre>
+                            <button class="command-copy-btn" data-target="linuxRefreshRateCommand">
+                                <svg width="16" height="16">
+                                    <use href="#icon-copy"/>
+                                </svg>
+                            </button>
+                            <span class="command-hint" data-tooltip-html="<strong>命令解释：</strong><br><br><strong>xrandr</strong><br>&nbsp;&nbsp;→ X Window System 的 RandR（Resize and Rotate）扩展工具。<br>&nbsp;&nbsp;→ 用于查询和配置显示器分辨率、刷新率等。<br>&nbsp;&nbsp;→ 直接运行会列出所有显示器和支持的分辨率/刷新率。<br><br><strong>| grep '*'</strong><br>&nbsp;&nbsp;→ 筛选带有 * 标记的行。<br>&nbsp;&nbsp;→ * 表示当前正在使用的分辨率和刷新率。<br>&nbsp;&nbsp;→ 输出格式：1920x1080 60.00*+ （60.00 就是刷新率）。">想了解命令意思？</span>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">浏览器：</span>
+                        <span id="browser" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">操作系统：</span>
+                        <span id="operatingSystem" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">CPU核心数：</span>
+                        <span id="cpuCores" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">设备内存：</span>
+                        <span id="deviceMemory" class="info-value">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 帧率与刷新率关系说明 -->
+            <div class="performance-section">
+                <h3 class="performance-section-title">💡 帧率（FPS）与刷新率（Hz）的关系</h3>
+                <div class="performance-tips">
+                    <p class="tip-item">
+                        <span class="fps-clarification-note">（注：在当前上下文中，FPS并不是指第一人称射击游戏，而是Frames Per Second的缩写）</span><br>
+                        <strong>FPS（帧率）</strong>：动画每秒渲染多少帧画面，由硬件性能决定。<br>
+                        <strong>Hz（刷新率）</strong>：显示器每秒能刷新多少次，由显示器硬件决定。<br>
+                        <strong>FPS ≤ 刷新率</strong>（如 60 FPS + 60Hz 显示器）：每一帧都能显示，体验流畅。<br>
+                        <strong>FPS > 刷新率</strong>（如 200 FPS + 60Hz 显示器）：超出的帧数会被丢弃，实际只能看到 60 帧。<br>
+                        <strong>FPS < 刷新率</strong>（如 30 FPS + 60Hz 显示器）：屏幕会重复显示同一帧，看起来明显卡顿。<br>
+                        因此性能评级是相对百分比（60Hz 显示器 57FPS=95%=优秀，144Hz 显示器 137FPS=95%=优秀）。
+                    </p>
+                </div>
+            </div>
+            
+            <!-- 图片信息面板 -->
+            <div class="performance-section">
+                <h3 class="performance-section-title">图片信息</h3>
+                <div class="image-info-panel">
+                    <div class="info-item">
+                        <span class="info-label">文件名:</span>
+                        <span id="imageFileName" class="info-value">-</span>
+                    </div>
+                    <div class="info-item hidden" id="imageOriginalFileSizeRow">
+                        <span class="info-label">原始文件大小:</span>
+                        <span id="imageOriginalFileSize" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label" id="imageFileSizeLabel">文件大小:</span>
+                        <span id="imageFileSize" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">文件格式:</span>
+                        <span id="imageFileFormat" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">原始图片尺寸:</span>
+                        <span id="imageOriginalDimensions" class="info-value">-</span>
+                    </div>
+                    <div class="info-item hidden" id="imageDownsampledDimensionsRow">
+                        <span class="info-label">采样后尺寸 <span class="tooltip-trigger" data-tooltip="降采样：为提升性能，将超大图片缩小到合适尺寸。&#10;原因：超过100MP（百万像素）的图片会导致浏览器渲染缓慢。&#10;放心：只影响程序内部显示，不会修改您的原始图片文件。">ⓘ</span>:</span>
+                        <span id="imageDownsampledDimensions" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">宽高比:</span>
+                        <span id="imageAspectRatio" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">PPI X轴(像素密度) <span class="tooltip-trigger" data-tooltip="PPI (Pixels Per Inch)：每英寸包含的像素数量。&#10;常见值：72 PPI（屏幕标准）、60 PPI（印刷标准）。&#10;PPI越高，图片越清晰。">ⓘ</span>:</span>
+                        <span id="imagePPIX" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">PPI Y轴(像素密度) <span class="tooltip-trigger" data-tooltip="PPI (Pixels Per Inch)：每英寸包含的像素数量。&#10;常见值：72 PPI（屏幕标准）、300 PPI（印刷标准）。&#10;PPI越高，图片越清晰。">ⓘ</span>:</span>
+                        <span id="imagePPIY" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label" id="imagePixelCountLabel">像素总数:</span>
+                        <span id="imagePixelCount" class="info-value">-</span>
+                    </div>
+                    <div class="info-item hidden" id="imageDownsampledPixelCountRow">
+                        <span class="info-label">采样后像素总数:</span>
+                        <span id="imageDownsampledPixelCount" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label" id="imageMPLabel">MP(百万像素):</span>
+                        <span id="imageMP" class="info-value">-</span>
+                    </div>
+                    <div class="info-item hidden" id="imageDownsampledMPRow">
+                        <span class="info-label">采样后MP(百万像素):</span>
+                        <span id="imageDownsampledMP" class="info-value">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Canvas信息面板 -->
+            <div class="performance-section">
+                <h3 class="performance-section-title">Canvas信息 <span class="tooltip-trigger" data-tooltip="Canvas：浏览器提供的绘图区域，用于渲染动画。&#10;本项目使用两个Canvas：入场动画Canvas和滚动动画Canvas。&#10;逻辑尺寸：代码中使用的尺寸。&#10;物理尺寸：实际渲染的像素数（受设备像素比影响）。">ⓘ</span></h3>
+                <div class="canvas-info-panel">
+                    <div class="info-item">
+                        <span class="info-label">入场Canvas信息：</span>
+                        <span id="entryCanvasInfo" class="info-value">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">滚动Canvas信息：</span>
+                        <span id="scrollCanvasInfo" class="info-value">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 边框跑马灯技术实现 -->
+            <div class="performance-section tech-implementation-section collapsed">
+                <h3 class="performance-section-title collapsible-title">
+                    <span class="title-text">💡 想了解容器边框跑马灯的实现原理？</span>
+                    <span class="collapse-icon">▶</span>
+                </h3>
+                <div class="tech-implementation-content collapsible-content">
+                    
+                    <!-- 目前的效果 -->
+                    <div class="tech-section">
+                        <h4 class="tech-section-title">✨ 目前的效果</h4>
+                        <ul class="tech-list-plain">
+                            <li>每一次循环周期（10秒）内会渐变6种颜色：蓝色 → 绿色 → 紫色 → 橙色 → 红色 → 青色。</li>
+                            <li>每个容器的起始颜色不同，让动画错开（第1个从蓝色开始，第2个从绿色开始...）。</li>
+                            <li>相邻容器的运动方向相反（第1、3、5个顺时针，第2、4、6个逆时针）。</li>
+                            <li>边框线条带有霓虹发光效果，发光颜色随着线条颜色同步渐变。</li>
+                            <li>动画无限循环，永不停止。</li>
+                        </ul>
+                    </div>
+                    
+                    <!-- 核心技术 -->
+                    <div class="tech-section">
+                        <h4 class="tech-section-title">🔧 核心技术</h4>
+                        
+                        <div class="tech-not-list">
+                            <p><strong>不是</strong> CSS Animation（<code>@keyframes</code>）</p>
+                            <p><strong>不是</strong> Canvas 绘制</p>
+                            <p><strong>不是</strong> JavaScript <code>requestAnimationFrame</code></p>
+                            <p><strong>不是</strong> 图片动画（GIF/APNG）</p>
+                            <p><strong>不是</strong> <code>::after</code> / <code>::before</code> 伪元素</p>
+                            <p><strong>不是</strong> 四个独立的 <code>&lt;div&gt;</code> 容器</p>
+                            <p><strong>不是</strong> 第三方动画库（如 GSAP、Anime.js）</p>
+                        </div>
+                        
+                        <p class="tech-highlight"><strong>而是：</strong></p>
+                        <div class="tech-item">
+                            <h5 class="tech-item-title">1. SVG Path + Stroke Dasharray</h5>
+                            <ul class="tech-sublist">
+                                <li>使用 <code>&lt;path&gt;</code> 元素绘制矩形边框。</li>
+                                <li>通过 <code>stroke-dasharray="10 90"</code> 创建“10单位实线 + 90单位空白”的虚线模式。</li>
+                                <li>通过 <code>pathLength="100"</code> 将路径长度标准化。</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="tech-item">
+                            <h5 class="tech-item-title">2. SMIL Animation（SVG原生动画）</h5>
+                            <ul class="tech-sublist">
+                                <li>使用 <code>&lt;animate&gt;</code> 元素驱动动画（不依赖CSS或JavaScript）。</li>
+                                <li>三个同步动画：
+                                    <ul>
+                                        <li><code>stroke-dashoffset</code> 动画：0 → ±100（控制跑马灯移动）。</li>
+                                        <li><code>stroke</code> 颜色动画：6色循环渐变。</li>
+                                        <li><code>flood-color</code> 颜色动画：发光色同步渐变。</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <div class="tech-item">
+                            <h5 class="tech-item-title">3. SVG Filter（发光效果）</h5>
+                            <p class="tech-description">使用滤镜链实现霓虹发光：</p>
+                            <div class="filter-chain">
+                                <div class="filter-step">feGaussianBlur（模糊 stdDeviation=0.8）</div>
+                                <div class="filter-arrow">↓</div>
+                                <div class="filter-step">feFlood（动态颜色填充 + opacity=0.6）</div>
+                                <div class="filter-arrow">↓</div>
+                                <div class="filter-step">feComposite（混合 operator=in）</div>
+                                <div class="filter-arrow">↓</div>
+                                <div class="filter-step">feMerge（合并发光层和原始线条）</div>
+                            </div>
+                        </div>
+                        
+                        <div class="tech-item">
+                            <h5 class="tech-item-title">4. 性能优化</h5>
+                            <ul class="tech-sublist">
+                                <li>使用 SVG 原生动画（GPU加速，不占用主线程）。</li>
+                                <li><code>pointer-events: none</code> 不阻塞用户交互。</li>
+                                <li><code>viewBox + preserveAspectRatio</code> 自适应容器尺寸，无需JS计算。</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- 技术权衡 -->
+                    <div class="tech-section">
+                        <h4 class="tech-section-title">⚖️ 技术权衡</h4>
+                        
+                        <div class="tech-tradeoff">
+                            <h5 class="tech-tradeoff-title">⚠️ 已知限制：非正方形容器中线条粗细不均匀</h5>
+                            
+                            <p class="tech-tradeoff-description">
+                                在宽高比不是1:1的容器中（如宽800px × 高200px），水平方向的线条会比垂直方向的线条更粗。这是因为使用了 <code>preserveAspectRatio="none"</code>，导致水平和垂直方向的缩放比例不同。
+                            </p>
+                            
+                            <div class="tech-tradeoff-why">
+                                <p><strong>为什么不修复？</strong></p>
+                                <p>SVG在非正方形容器中存在一个"不可能三角"，只能选择其中两个：</p>
+                                <ul class="tech-tradeoff-list">
+                                    <li><strong>完美覆盖边框</strong> - SVG无缝贴合容器边缘</li>
+                                    <li><strong>线条粗细一致</strong> - 水平/垂直线条粗细相同</li>
+                                    <li><strong>无视觉异常</strong> - 不出现多条线、错位等问题</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="tech-tradeoff-options">
+                                <p><strong>尝试过的方案：</strong></p>
+                                <table class="tech-tradeoff-table">
+                                    <thead>
+                                        <tr>
+                                            <th>方案</th>
+                                            <th>完美覆盖</th>
+                                            <th>粗细一致</th>
+                                            <th>无异常</th>
+                                            <th>结果</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr class="current-solution">
+                                            <td><code>preserveAspectRatio="none"</code></td>
+                                            <td>✅</td>
+                                            <td>❌</td>
+                                            <td>✅</td>
+                                            <td><strong>当前方案</strong></td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>preserveAspectRatio="slice"</code></td>
+                                            <td>✅</td>
+                                            <td>✅</td>
+                                            <td>❌</td>
+                                            <td>出现多条线</td>
+                                        </tr>
+                                        <tr>
+                                            <td><code>vector-effect="non-scaling-stroke"</code></td>
+                                            <td>✅</td>
+                                            <td>⚠️</td>
+                                            <td>✅</td>
+                                            <td>粗细固定但不协调</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div class="tech-tradeoff-conclusion">
+                                <p><strong>最终选择：</strong>接受线条粗细不均匀，因为这是<strong>视觉影响最小</strong>的选择。在大多数容器中（宽高比接近），这个差异并不明显。</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 源代码展示 -->
+                    <!-- 
+                        为什么硬编码源代码而不是动态读取？
+                        
+                        1. YAGNI原则：动态读取需要HTTP请求、正则解析、错误处理，复杂度远超收益
+                        2. KISS原则：硬编码更简单直接，维护成本低
+                        3. 代码稳定：边框跑马灯核心逻辑基本不会修改
+                        4. DRY不冲突：这是文档展示（类似README），不是重复的业务逻辑
+                        5. 静态网站理念：避免引入不必要的动态性
+                        
+                        权衡结果：硬编码的简单性 > 动态读取的自动同步
+                    -->
+                    <div class="tech-section">
+                        <h4 class="tech-section-title">📝 源代码</h4>
+                        
+                        <!-- JavaScript -->
+                        <div class="code-block-wrapper">
+                            <h5 class="code-block-title">JavaScript（核心逻辑）</h5>
+                            <pre><code class="language-javascript">// 方法1：初始化所有section的边框跑马灯动画
+_initBorderMarqueeAnimations(container) {
+    // 6种颜色序列（每个容器从不同颜色开始，让动画错开）
+    const colorSequences = [
+        ['#3b82f6', '#10b981', '#a855f7', '#f97316', '#ef4444', '#06b6d4'],  // 从蓝色开始
+        ['#10b981', '#a855f7', '#f97316', '#ef4444', '#06b6d4', '#3b82f6'],  // 从绿色开始
+        ['#a855f7', '#f97316', '#ef4444', '#06b6d4', '#3b82f6', '#10b981'],  // 从紫色开始
+        ['#f97316', '#ef4444', '#06b6d4', '#3b82f6', '#10b981', '#a855f7'],  // 从橙色开始
+        ['#ef4444', '#06b6d4', '#3b82f6', '#10b981', '#a855f7', '#f97316'],  // 从红色开始
+        ['#06b6d4', '#3b82f6', '#10b981', '#a855f7', '#f97316', '#ef4444']   // 从青色开始
+    ];
+    
+    // 查找所有.performance-section容器
+    const sections = container.querySelectorAll('.performance-section');
+    
+    sections.forEach((section, index) => {
+        // 为每个容器创建SVG边框跑马灯（使用对应的颜色序列）
+        const colors = colorSequences[index % colorSequences.length];
+        // 容器1,3,5顺时针，容器2,4,6逆时针
+        const isClockwise = index % 2 === 0;
+        const svg = this._createBorderMarqueeSVG(colors, index, isClockwise);
+        
+        // 将SVG插入到容器的第一个位置
+        section.insertBefore(svg, section.firstChild);
+    });
+}
+
+// 方法2：创建单个边框跑马灯SVG元素
+_createBorderMarqueeSVG(colors, index, isClockwise) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('performance-section-border-marquee');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    
+    // 创建&lt;defs&gt;定义
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    
+    // 创建发光滤镜（动态颜色）
+    const filterId = `border-marquee-glow-${index}`;
+    const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+    filter.setAttribute('id', filterId);
+    
+    const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+    blur.setAttribute('stdDeviation', '0.8');
+    blur.setAttribute('result', 'blur');
+    
+    const flood = document.createElementNS('http://www.w3.org/2000/svg', 'feFlood');
+    flood.setAttribute('flood-color', colors[0]);
+    flood.setAttribute('flood-opacity', '0.6');
+    
+    const composite = document.createElementNS('http://www.w3.org/2000/svg', 'feComposite');
+    composite.setAttribute('in2', 'blur');
+    composite.setAttribute('operator', 'in');
+    
+    const merge = document.createElementNS('http://www.w3.org/2000/svg', 'feMerge');
+    const mergeNode1 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+    const mergeNode2 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+    mergeNode2.setAttribute('in', 'SourceGraphic');
+    
+    merge.appendChild(mergeNode1);
+    merge.appendChild(mergeNode2);
+    
+    filter.appendChild(blur);
+    filter.appendChild(flood);
+    filter.appendChild(composite);
+    filter.appendChild(merge);
+    
+    // 发光颜色动画
+    const floodColorAnimate = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
+    floodColorAnimate.setAttribute('attributeName', 'flood-color');
+    floodColorAnimate.setAttribute('values', colors.join(';') + ';' + colors[0]);
+    floodColorAnimate.setAttribute('dur', '10s');
+    floodColorAnimate.setAttribute('repeatCount', 'indefinite');
+    flood.appendChild(floodColorAnimate);
+    
+    defs.appendChild(filter);
+    svg.appendChild(defs);
+    
+    // 创建路径元素
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', 'M 1,1 L 99,1 L 99,99 L 1,99 Z');
+    path.setAttribute('stroke', colors[0]);
+    path.setAttribute('stroke-width', '0.6');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('filter', `url(#${filterId})`);
+    path.setAttribute('pathLength', '100');
+    path.setAttribute('stroke-dasharray', '10 90');
+    path.setAttribute('stroke-dashoffset', '0');
+    path.setAttribute('stroke-linecap', 'round');
+    
+    // 位置动画（负数=顺时针，正数=逆时针）
+    const offsetAnimate = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
+    offsetAnimate.setAttribute('attributeName', 'stroke-dashoffset');
+    offsetAnimate.setAttribute('from', '0');
+    offsetAnimate.setAttribute('to', isClockwise ? '-100' : '100');
+    offsetAnimate.setAttribute('dur', '10s');
+    offsetAnimate.setAttribute('repeatCount', 'indefinite');
+    
+    // 颜色动画
+    const colorAnimate = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
+    colorAnimate.setAttribute('attributeName', 'stroke');
+    colorAnimate.setAttribute('values', colors.join(';') + ';' + colors[0]);
+    colorAnimate.setAttribute('dur', '10s');
+    colorAnimate.setAttribute('repeatCount', 'indefinite');
+    
+    path.appendChild(offsetAnimate);
+    path.appendChild(colorAnimate);
+    svg.appendChild(path);
+    
+    return svg;
+}</code></pre>
+                        </div>
+                        
+                        <!-- CSS -->
+                        <div class="code-block-wrapper">
+                            <h5 class="code-block-title">CSS（定位样式）</h5>
+                            <pre><code class="language-css">/* SVG 边框跑马灯动画 - 自适应容器尺寸 */
+.performance-section-border-marquee {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;  /* 不阻塞用户交互 */
+    z-index: 1;            /* 显示在内容上方 */
+}</code></pre>
+                        </div>
+                    </div>
+                    
+                    <!-- 实现位置 -->
+                    <div class="tech-reference">
+                        <p><strong>📁 实现位置：</strong><code>js/services/ui/PerformanceReportPage.js</code> 的 <code>_initBorderMarqueeAnimations()</code> 和 <code>_createBorderMarqueeSVG()</code> 方法</p>
+                    </div>
+                    
+                </div>
+            </div>
+            
+            <!-- 性能报告面板 -->
+            <div class="performance-section">
+                <h3 class="performance-section-title">性能报告</h3>
+                <div class="performance-report-renderer">
+                    <div id="reportEmptyState" class="report-empty-state">暂无性能数据，请先开启监控并播放动画。</div>
+                    <div id="reportContent" class="report-content hidden">
+                        <div class="report-header">
+                            <div class="report-timestamp-container">
+                                <span class="info-label">报告生成时间：</span>
+                                <span id="reportTimestamp" class="info-value">-</span>
+                            </div>
+                            <div class="report-complete-indicator">
+                                <span id="reportCompleteStatus" class="complete-status">-</span>
+                            </div>
+                        </div>
+                        
+                        <div class="report-comparison-container">
+                            <!-- 入场动画性能报告 -->
+                            <div id="entryReportSection" class="report-column">
+                                <h3 class="report-column-title">入场动画性能</h3>
+                                
+                                <!-- 核心指标卡片 -->
+                                <div class="core-metrics">
+                                    <div class="metric-card">
+                                        <div class="metric-label">性能等级 <span class="tooltip-trigger" data-tooltip="">ⓘ</span></div>
+                                        <div id="entryPerfLevel" class="metric-value-large">-</div>
+                                    </div>
+                                    <div class="metric-card">
+                                        <div class="metric-label">平均FPS</div>
+                                        <div id="entryAvgFPS" class="metric-value-large">-</div>
+                                    </div>
+                                    <div class="metric-card">
+                                        <div class="metric-label">刷新率利用率 <span class="tooltip-trigger" data-tooltip="">ⓘ</span></div>
+                                        <div id="entryRefreshRateUtilization" class="metric-value-large">-</div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 基本信息 -->
+                                <div class="metric-group">
+                                    <h4 class="group-title">基本信息</h4>
+                                    <div class="metric-grid grid-2col">
+                                        <div class="metric-item">
+                                            <span class="metric-label">动画总时长</span>
+                                            <span id="entryTotalDuration" class="metric-value">-</span>
+                                        </div>
+                                        <div class="metric-item">
+                                            <span class="metric-label">总帧数 <span class="tooltip-trigger" data-tooltip="">ⓘ</span></span>
+                                            <span id="entryTotalFrames" class="metric-value">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- FPS详细分析 -->
+                                <div class="metric-group">
+                                    <h4 class="group-title">FPS详细分析</h4>
+                                    <!-- 共享说明区域（H形横杠，仅在入场列显示但视觉横跨两列） -->
+                                    <div class="fps-shared-explanation">
+                                        <p class="metric-group-note">
+                                            <strong>实际FPS vs 理论FPS：</strong>实际FPS基于RAF<span class="tooltip-trigger" data-tooltip="RequestAnimationFrame（请求动画帧）。">ⓘ</span>帧间隔，受屏幕刷新率物理限制；理论FPS基于业务代码执行耗时计算（1000ms / 平均帧耗时），反映代码执行效率。即使理论FPS达到好几千，在60Hz显示器上实际FPS最高也只能是60。<br>
+                                            <strong>为什么理论FPS不使用RAF<span class="tooltip-trigger" data-tooltip="RequestAnimationFrame（请求动画帧）。">ⓘ</span>帧间隔？</strong>因为RAF<span class="tooltip-trigger" data-tooltip="RequestAnimationFrame（请求动画帧）。">ⓘ</span>帧间隔已被刷新率限制，无法真实反映代码性能。使用业务代码执行耗时可以排除硬件限制，评估代码优化潜力。
+                                        </p>
+                                    </div>
+                                    <div class="metric-grid grid-2col">
+                                        <div class="metric-item">
+                                            <span class="metric-label">实际平均FPS</span>
+                                            <span id="entryActualAvgFPS" class="metric-value">-</span>
+                                        </div>
+                                        <div class="metric-item">
+                                            <span class="metric-label">理论平均FPS<span class="tooltip-trigger" data-tooltip="">ⓘ</span></span>
+                                            <span id="entryTheoreticalAvgFPS" class="metric-value">-</span>
+                                        </div>
+                                        <div class="metric-item">
+                                            <span class="metric-label">实际最小FPS</span>
+                                            <span id="entryMinFPS" class="metric-value">-</span>
+                                        </div>
+                                        <div class="metric-item">
+                                            <span class="metric-label">理论最小FPS<span class="tooltip-trigger" data-tooltip="">ⓘ</span></span>
+                                            <span id="entryTheoreticalMinFPS" class="metric-value">-</span>
+                                        </div>
+                                        <div class="metric-item">
+                                            <span class="metric-label">实际最大FPS</span>
+                                            <span id="entryMaxFPS" class="metric-value">-</span>
+                                        </div>
+                                        <div class="metric-item">
+                                            <span class="metric-label">理论最大FPS<span class="tooltip-trigger" data-tooltip="">ⓘ</span></span>
+                                            <span id="entryTheoreticalMaxFPS" class="metric-value">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 帧耗时分析 -->
+                                <div class="metric-group">
+                                    <h4 class="group-title">帧耗时分析 <span class="tooltip-trigger" data-tooltip="">ⓘ</span></h4>
+                                    <div class="metric-grid grid-3col">
+                                        <div class="metric-item">
+                                            <span class="metric-label">平均</span>
+                                            <span id="entryAvgFrameTime" class="metric-value">-</span>
+                                        </div>
+                                        <div class="metric-item">
+                                            <span class="metric-label">最小</span>
+                                            <span id="entryMinFrameTime" class="metric-value">-</span>
+                                        </div>
+                                        <div class="metric-item">
+                                            <span class="metric-label">最大</span>
+                                            <span id="entryMaxFrameTime" class="metric-value">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Canvas调用统计 -->
+                                <div class="metric-group">
+                                    <h4 class="group-title">Canvas调用统计 <span class="tooltip-trigger" data-tooltip="">ⓘ</span></h4>
+                                    <div class="metric-grid grid-2col">
+                                        <div class="metric-item">
+                                            <span class="metric-label">drawImage总调用</span>
+                                            <span id="entryDrawImageTotal" class="metric-value">-</span>
+                                        </div>
+                                        <div class="metric-item">
+                                            <span class="metric-label">drawImage平均调用</span>
+                                            <span id="entryDrawImageAvg" class="metric-value">-</span>
+                                        </div>
+                                        <div class="metric-item">
+                                            <span class="metric-label">getContext总调用</span>
+                                            <span id="entryGetContextTotal" class="metric-value">-</span>
+                                        </div>
+                                        <div class="metric-item">
+                                            <span class="metric-label">getContext平均调用</span>
+                                            <span id="entryGetContextAvg" class="metric-value">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- 耗时分解（仅入场动画） -->
+                                <div class="metric-group">
+                                    <h4 class="group-title">耗时分解 <span class="tooltip-trigger" data-tooltip="耗时分解：将每帧耗时细分为各个操作环节。&#10;&#10;清屏耗时：清空画布并填充背景色的时间。&#10;卡片绘制耗时：绘制所有卡片的时间。&#10;Canvas操作耗时：所有Canvas绘图操作的总时间（清屏+卡片）。&#10;业务逻辑耗时：非绘图操作的时间（进度计算、策略逻辑、事件通知等）。&#10;&#10;提示：Canvas操作耗时 + 业务逻辑耗时 = 帧耗时。">ⓘ</span></h4>
+                                    <div class="metric-grid grid-2col">
+                                        <div class="metric-item">
+                                            <span class="metric-label">清屏耗时</span>
+                                            <span id="entryClearTime" class="metric-value">-</span>
+                                        </div>
+                                        <div class="metric-item">
+                                            <span class="metric-label">卡片绘制耗时</span>
+                                            <span id="entryCardTime" class="metric-value">-</span>
+                                        </div>
+                                        <div class="metric-item">
+                                            <span class="metric-label">Canvas操作耗时</span>
+                                            <span id="entryCanvasTime" class="metric-value">-</span>
+                                        </div>
+                                        <div class="metric-item">
+                                            <span class="metric-label">业务逻辑耗时</span>
+                                            <span id="entryBusinessTime" class="metric-value">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        
+                        <!-- 滚动动画性能报告 -->
+                        <div id="scrollReportSection" class="report-column">
+                            <h3 class="report-column-title">滚动动画性能</h3>
+                            
+                            <!-- 核心指标卡片 -->
+                            <div class="core-metrics">
+                                <div class="metric-card">
+                                    <div class="metric-label">性能等级 <span class="tooltip-trigger" data-tooltip="">ⓘ</span></div>
+                                    <div id="scrollPerfLevel" class="metric-value-large">-</div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="metric-label">平均FPS</div>
+                                    <div id="scrollAvgFPS" class="metric-value-large">-</div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="metric-label">刷新率利用率 <span class="tooltip-trigger" data-tooltip="">ⓘ</span></div>
+                                    <div id="scrollRefreshRateUtilization" class="metric-value-large">-</div>
+                                </div>
+                            </div>
+                            
+                            <!-- 基本信息 -->
+                            <div class="metric-group">
+                                <h4 class="group-title">基本信息</h4>
+                                <div class="metric-grid grid-2col">
+                                    <div class="metric-item">
+                                        <span class="metric-label">动画总时长</span>
+                                        <span id="scrollTotalDuration" class="metric-value">-</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">总帧数 <span class="tooltip-trigger" data-tooltip="">ⓘ</span></span>
+                                        <span id="scrollTotalFrames" class="metric-value">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- FPS详细分析 -->
+                            <div class="metric-group">
+                                <h4 class="group-title">FPS详细分析</h4>
+                                <!-- 占位符：与入场列的横杠保持高度一致 -->
+                                <div class="fps-shared-placeholder"></div>
+                                <div class="metric-grid grid-2col">
+                                    <div class="metric-item">
+                                        <span class="metric-label">实际平均FPS</span>
+                                        <span id="scrollActualAvgFPS" class="metric-value">-</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">理论平均FPS<span class="tooltip-trigger" data-tooltip="">ⓘ</span></span>
+                                        <span id="scrollTheoreticalAvgFPS" class="metric-value">-</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">实际最小FPS</span>
+                                        <span id="scrollMinFPS" class="metric-value">-</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">理论最小FPS<span class="tooltip-trigger" data-tooltip="">ⓘ</span></span>
+                                        <span id="scrollTheoreticalMinFPS" class="metric-value">-</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">实际最大FPS</span>
+                                        <span id="scrollMaxFPS" class="metric-value">-</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">理论最大FPS<span class="tooltip-trigger" data-tooltip="">ⓘ</span></span>
+                                        <span id="scrollTheoreticalMaxFPS" class="metric-value">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 帧耗时分析 -->
+                            <div class="metric-group">
+                                <h4 class="group-title">帧耗时分析 <span class="tooltip-trigger" data-tooltip="">ⓘ</span></h4>
+                                <div class="metric-grid grid-3col">
+                                    <div class="metric-item">
+                                        <span class="metric-label">平均</span>
+                                        <span id="scrollAvgFrameTime" class="metric-value">-</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">最小</span>
+                                        <span id="scrollMinFrameTime" class="metric-value">-</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">最大</span>
+                                        <span id="scrollMaxFrameTime" class="metric-value">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Canvas调用统计 -->
+                            <div class="metric-group">
+                                <h4 class="group-title">Canvas调用统计 <span class="tooltip-trigger" data-tooltip="">ⓘ</span></h4>
+                                <div class="metric-grid grid-2col">
+                                    <div class="metric-item">
+                                        <span class="metric-label">drawImage总调用</span>
+                                        <span id="scrollDrawImageTotal" class="metric-value">-</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">drawImage平均调用</span>
+                                        <span id="scrollDrawImageAvg" class="metric-value">-</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">getContext总调用</span>
+                                        <span id="scrollGetContextTotal" class="metric-value">-</span>
+                                    </div>
+                                    <div class="metric-item">
+                                        <span class="metric-label">getContext平均调用</span>
+                                        <span id="scrollGetContextAvg" class="metric-value">-</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 查看更多按钮（默认隐藏，有报告数据时显示） -->
+            <div class="report-actions hidden">
+                <button id="viewMoreBtn" class="view-more-btn">查看更多</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- 颜色选择器：固定预设色块模板 -->
+    <template id="color-picker-preset-box-template">
+        <div class="color-picker-preset-box"></div>
+    </template>
+
+    <!-- 颜色选择器：自定义预设色块模板 -->
+    <template id="color-picker-custom-preset-box-template">
+        <div class="color-picker-custom-preset-box">
+            <button class="color-picker-custom-preset-delete-btn">×</button>
+        </div>
+    </template>
+    
+    <!-- 颜色选择器：自定义预设空状态提示模板 -->
+    <template id="color-picker-custom-presets-empty-template">
+        <div class="color-picker-custom-presets-empty">暂无自定义预设。</div>
+    </template>
+    
+    <!-- Tooltip模板 -->
+    <template id="tooltip-template">
+        <div class="tooltip-container" role="tooltip">
+            <div class="tooltip-content"></div>
+        </div>
+    </template>
+    
+    <!-- 性能报告无数据模板 -->
+    <template id="performance-report-no-data-template">
+        <div class="performance-report-no-data">
+            <p class="no-data-message">检测到在入场动画期间{reason}，因此滚动动画报告无数据。</p>
+        </div>
+    </template>
+    
+    <!-- 过渡动画对象池容器 -->
+    <div id="transition-fragment-pool-container" class="fragment-pool-container hidden">
+        <!-- 网格遮罩容器模板 -->
+        <div class="mask-container" data-pool-type="mask-container"></div>
+        
+        <!-- 网格遮罩方块模板 -->
+        <div class="mask-tile" data-pool-type="mask-tile"></div>
+    </div>
+    
+    <!-- 性能数据可视化视图（全屏显示，独立于配置页面） -->
+    <div id="performance-visualization-view" class="visualization-view hidden">
+        <!-- 可视化视图头部 -->
+        <div class="visualization-header">
+            <h2 class="visualization-title">性能数据可视化</h2>
+            <button id="backToReportBtn" class="back-to-report-btn">← 返回报告</button>
+        </div>
+        
+        <!-- 可视化视图内容 -->
+        <div class="visualization-content">
+            <!-- 入场动画图表区域 -->
+            <div class="entry-charts-section chart-section hidden">
+                <h3 class="chart-section-title">入场动画性能分析</h3>
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <div id="entry-fps-distribution" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div id="entry-frametime-trend" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div id="entry-stability-radar" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div id="entry-framedrop-pie" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title-bar">
+                            <span class="chart-title-text">百分位数帧耗时</span>
+                            <span class="chart-help-icon" data-tooltip-html="<strong>P50（中位数）</strong>：50%的帧比这个值快，50%的帧比这个值慢。<br><span style='margin-left: 1em;'>代表'典型帧'的耗时。</span><br><br><strong>P95</strong>：95%的帧比这个值快，只有5%的帧比这个值慢。<br><span style='margin-left: 1em;'>代表'几乎所有帧'的性能水平。</span><br><br><strong>P99</strong>：99%的帧比这个值快，只有1%的帧比这个值慢。<br><span style='margin-left: 1em;'>代表'最坏情况'（排除极端异常）。</span><br><br><em>P99越接近P50，说明性能越稳定。</em>">?</span>
+                        </div>
+                        <div id="entry-percentile-chart" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title-bar">
+                            <span class="chart-title-text">FPS对比</span>
+                            <span class="chart-help-icon" data-tooltip-html="<strong>1%低点FPS</strong>：把所有帧的FPS排序，取最慢的1%的平均值。<br><span style='margin-left: 1em;'>代表'卡顿时'的帧率。</span><br><br><strong>0.1%低点FPS</strong>：把所有帧的FPS排序，取最慢的0.1%的平均值。<br><span style='margin-left: 1em;'>代表'最极端卡顿时'的帧率。</span><br><br><em>即使平均FPS很高，如果低点FPS太低，<br>仍会感到明显卡顿。</em>">?</span>
+                        </div>
+                        <div class="stutter-count" id="entry-stutter-count"></div>
+                        <div id="entry-fps-comparison-chart" class="chart"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 滚动动画图表区域 -->
+            <div class="scroll-charts-section chart-section hidden">
+                <h3 class="chart-section-title">滚动动画性能分析</h3>
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <div id="scroll-fps-distribution" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div id="scroll-frametime-trend" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div id="scroll-stability-radar" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div id="scroll-framedrop-pie" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title-bar">
+                            <span class="chart-title-text">百分位数帧耗时</span>
+                            <span class="chart-help-icon" data-tooltip-html="<strong>P50（中位数）</strong>：50%的帧比这个值快，50%的帧比这个值慢。<br><span style='margin-left: 1em;'>代表'典型帧'的耗时。</span><br><br><strong>P95</strong>：95%的帧比这个值快，只有5%的帧比这个值慢。<br><span style='margin-left: 1em;'>代表'几乎所有帧'的性能水平。</span><br><br><strong>P99</strong>：99%的帧比这个值快，只有1%的帧比这个值慢。<br><span style='margin-left: 1em;'>代表'最坏情况'（排除极端异常）。</span><br><br><em>P99越接近P50，说明性能越稳定。</em>">?</span>
+                        </div>
+                        <div id="scroll-percentile-chart" class="chart"></div>
+                    </div>
+                    <div class="chart-container">
+                        <div class="chart-title-bar">
+                            <span class="chart-title-text">FPS对比</span>
+                            <span class="chart-help-icon" data-tooltip-html="<strong>1%低点FPS</strong>：把所有帧的FPS排序，取最慢的1%的平均值。<br><span style='margin-left: 1em;'>代表'卡顿时'的帧率。</span><br><br><strong>0.1%低点FPS</strong>：把所有帧的FPS排序，取最慢的0.1%的平均值。<br><span style='margin-left: 1em;'>代表'最极端卡顿时'的帧率。</span><br><br><em>即使平均FPS很高，如果低点FPS太低，<br>仍会感到明显卡顿。</em>">?</span>
+                        </div>
+                        <div class="stutter-count" id="scroll-stutter-count"></div>
+                        <div id="scroll-fps-comparison-chart" class="chart"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Prism.js 代码高亮 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+</body>
+</html>

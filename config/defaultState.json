@@ -1,0 +1,145 @@
+{
+  "app": {
+    "isInitialized": false,
+    "isLoading": false
+  },
+  "content": {
+    "image": {
+      "data": null,
+      "isLoaded": false,
+      "metadata": {
+        "fileName": "",
+        "fileSize": 0,
+        "width": 0,
+        "height": 0,
+        "originalWidth": 0,
+        "originalHeight": 0,
+        "lastModified": null
+      },
+      "scaling": {
+        "ratio": 1.0,
+        "scaledWidth": 0,
+        "scaledHeight": 0
+      }
+    }
+  },
+  "playback": {
+    "scroll": {
+      "startPosition": 0,
+      "endPosition": 0,
+      "duration": 30,
+      "reverseScroll": false,
+      "lockToImageEnd": false,
+      "isPlaying": false,
+      "isPaused": false,
+      "isCompleted": false,
+      "currentPosition": 0
+    },
+    "loop": {
+      "enabled": false,
+      "count": 0,
+      "currentLoop": 0,
+      "variableDuration": false,
+      "durationSequence": [],
+      "intervalTime": 500,
+      "autoResetAfterComplete": false
+    },
+    "entryAnimation": {
+      "enabled": false,
+      "cardBoundaries": [],
+      "cardAnimations": [],
+      "duration": 1000,
+      "staggerDelay": 500,
+      "intervalBeforeScroll": 500,
+      "markedAtStartPosition": null,
+      "markedAtEndPosition": null
+    }
+  },
+  "ui": {
+    "layout": {
+      "sidebarOpacity": 95,
+      "sidebarCollapsed": false,
+      "dragOver": false
+    },
+    "display": {
+      "backgroundColor": "#ffffff"
+    },
+    "entryAnimationPanel": {
+      "showCardPositionInfo": false
+    },
+    "isTransitioning": false
+  },
+  "validation": {
+    "image": {
+      "idealMinAspectRatio": 2.0,
+      "maxSafeWidth": 50000,
+      "maxSafeHeight": 20000,
+      "maxSafePixels": 209715200,
+      "maxFileSize": 52428800,
+      "minRecommendedWidth": 1920,
+      "minRecommendedHeight": 400,
+      "viewportMultiplier": 1.5,
+      "largeImageThreshold": 100000000,
+      "targetMaxPixels": 50000000
+    },
+    "sequence": {
+      "minDuration": 1
+    },
+    "loop": {
+      "minCount": 1,
+      "maxCount": 100
+    },
+    "ui": {
+      "minSidebarOpacity": 20,
+      "maxSidebarOpacity": 100
+    },
+    "ppi": {
+      "minValue": 0,
+      "maxValue": 9999
+    },
+    "performance": {
+      "minRefreshRate": 30,
+      "maxRefreshRate": 500
+    }
+  },
+  "debug": {
+    "performance": {
+      "estimatedRefreshRate": null,
+      "lastReport": {
+        "timestamp": null,
+        "isComplete": false,
+        "entryAnimation": null,
+        "scrollAnimation": null
+      }
+    }
+  },
+  "preferences": {
+    "sidebar": {
+      "autoHide": false,
+      "autoHideDelay": 0
+    },
+    "progressBar": {
+      "hide": false,
+      "hideOnPause": false,
+      "keepOnComplete": false
+    },
+    "scrolling": {
+      "animationStrategy": "linear"
+    },
+    "colorPicker": {
+      "customPresets": []
+    },
+    "performance": {
+      "enabled": false,
+      "showRealtimeFPS": false,
+      "userRefreshRate": null
+    }
+  },
+  "contact": {
+    "email": "hatsusumi-moe@163.com"
+  },
+  "system": {
+    "version": "1.0",
+    "supportedVersions": ["1.0"]
+  }
+}
