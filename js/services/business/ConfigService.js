@@ -69,7 +69,8 @@ const CONFIG_TO_STATE_MAPPING = {
     'entryAnimationMarkedAtEndPosition': 'playback.entryAnimation.markedAtEndPosition',
 
     // 界面 (来自 config.ui)
-    'sidebarOpacity': 'ui.layout.sidebarOpacity'
+    'sidebarOpacity': 'ui.layout.sidebarOpacity',
+    'backgroundColor': 'ui.display.backgroundColor'
 };
 
 export class ConfigService {
@@ -266,6 +267,7 @@ export class ConfigService {
         const loopState = state.playback.loop;
         const entryAnimationState = state.playback.entryAnimation;
         const layoutState = state.ui.layout;
+        const displayState = state.ui.display;
         
         // 性能优化：解构imageData减少属性访问
         // Fail Fast: 导出配置时必须有已加载的图片
@@ -338,7 +340,8 @@ export class ConfigService {
                 entryAnimationMarkedAtEndPosition: entryAnimationState.markedAtEndPosition
             },
             ui: {
-                sidebarOpacity: layoutState.sidebarOpacity
+                sidebarOpacity: layoutState.sidebarOpacity,
+                backgroundColor: displayState.backgroundColor
             }
         };
         

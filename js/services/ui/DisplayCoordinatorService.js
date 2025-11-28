@@ -198,14 +198,17 @@ export class DisplayCoordinatorService extends BaseUIService {
         // 注：不使用 StateWatcher 监听 metadata，因为 batch() 修改对象属性不会触发监听器
         this.eventBus.on('image:info-updated', (data) => {
             if (data && data.imageData) {
-                // 构造符合 updateImageInfo 期望的参数格式
+                // 构造完整的元数据对象
                 const imageMetadata = {
                     fileName: this.stateManager.state.content.image.metadata.fileName,
                     fileSize: this.stateManager.state.content.image.metadata.fileSize,
                     width: data.imageData.width,
                     height: data.imageData.height
                 };
-                this.updateImageInfo(imageMetadata);
+                
+                // ♻️ 复用统一的处理逻辑：同时更新 Scaling 和 Info
+                // 这确保了配置导入时 Scaling 也能被立即计算，避免后续渲染报错
+                this._handleImageDataUpdate(imageMetadata);
             }
         });
         
@@ -343,8 +346,6 @@ export class DisplayCoordinatorService extends BaseUIService {
         }
         
         // Fail Fast: 验证scaling有效性
-        // 正常情况下，此方法只在图片加载完成且scaling已计算后被调用
-        // 如果scaling无效，说明调用时机有误或状态异常，应该立即暴露问题
         const scaling = this.stateManager.state.content.image.scaling;
         if (!scaling || 
             typeof scaling.scaledWidth !== 'number' || !isFinite(scaling.scaledWidth) || scaling.scaledWidth <= 0 ||
@@ -352,25 +353,67 @@ export class DisplayCoordinatorService extends BaseUIService {
             throw new Error('DisplayCoordinatorService._renderImageToCanvas: valid scaling info is required');
         }
         
-        // 设置Canvas尺寸为缩放后的图片尺寸
-        this.canvasRenderService.setupCanvas(canvas, scaling.scaledWidth, scaling.scaledHeight);
+        // 检查是否启用了入场动画（除非强制绘制完整图片）
+        const entryAnimationEnabled = this.stateManager.state.playback.entryAnimation.enabled;
+        const backgroundColor = this.stateManager.state.ui.display.backgroundColor;
+        
+        // 判断是否仅需渲染视口背景色（优化模式）
+        // 如果是背景色模式，我们不需要创建全尺寸的超大 Canvas，只需要视口大小即可
+        const isViewportBackgroundOnly = entryAnimationEnabled && !forceFullImage;
+        
+        let targetWidth, targetHeight;
+        
+        if (isViewportBackgroundOnly) {
+            // 🚀 性能优化：只创建视口大小的 Canvas
+            // 解决 Canvas 物理尺寸超过浏览器限制（如 16384px）导致渲染失效的问题
+            const container = this._getElement('scrollContainer');
+            
+            // Fail Fast: 验证容器是否存在
+            // scrollContainer 是核心 UI 元素，如果缺失说明 DOM 结构异常，必须报错
+            if (!container) {
+                throw new Error('DisplayCoordinatorService._renderImageToCanvas: scrollContainer element not found');
+            }
+            
+            targetWidth = container.clientWidth;
+            targetHeight = container.clientHeight;
+        } else {
+            // 完整图片模式：必须创建全尺寸 Canvas 以容纳完整长图
+            targetWidth = scaling.scaledWidth;
+            targetHeight = scaling.scaledHeight;
+        }
+        
+        // 设置Canvas尺寸
+        this.canvasRenderService.setupCanvas(canvas, targetWidth, targetHeight);
         
         // 清空Canvas
         this.canvasRenderService.clear(canvas);
         
-        // 检查是否启用了入场动画（除非强制绘制完整图片）
-        const entryAnimationEnabled = this.stateManager.state.playback.entryAnimation.enabled;
-        
-        if (entryAnimationEnabled && !forceFullImage) {
+        if (isViewportBackgroundOnly) {
             // 启用了入场动画 + 非强制模式：只填充背景色，不绘制图片
             // 卡片将在播放时通过入场动画逐渐显示
-            const backgroundColor = this.stateManager.state.ui.display.backgroundColor;
             if (backgroundColor) {
-                // 使用CanvasRenderService填充背景色（利用上下文缓存）
-                this.canvasRenderService.fillRect(canvas, 0, 0, canvas.width, canvas.height, backgroundColor);
+                // 🛡️ 双重保险：设置 CSS 背景色
+                canvas.style.backgroundColor = backgroundColor;
+
+                // 使用CanvasRenderService填充背景色
+                // 使用计算出的 targetWidth/targetHeight (即视口尺寸)
+                this.canvasRenderService.fillRect(
+                    canvas, 
+                    0, 
+                    0, 
+                    targetWidth, 
+                    targetHeight, 
+                    backgroundColor
+                );
+            } else {
+                // 清除背景色
+                canvas.style.backgroundColor = '';
             }
         } else {
             // 未启用入场动画 或 强制模式：绘制完整图片
+            // 清除 CSS 背景色
+            canvas.style.backgroundColor = '';
+            
             this.canvasRenderService.drawImageClipped(
                 canvas,
                 image,

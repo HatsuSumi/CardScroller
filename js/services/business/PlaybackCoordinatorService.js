@@ -1332,11 +1332,9 @@ export class PlaybackCoordinatorService {
         }
         
         if (entryAnimationEnabled) {
-            // 直接清空entry-canvas
-            const entryCanvas = getEntryCanvas();
-            this.canvasRenderService.clearCanvas(entryCanvas);
-            
-            // 🐛 Bug修复：触发刷新而不是清空，让DisplayCoordinator根据当前状态（用户设置的背景色）重绘
+            // 🐛 Bug修复：不要手动清空Canvas，这会导致"瞬间变白"的问题
+            // 如果图片未加载完成，display:refresh-canvas会被跳过，导致Canvas保持透明（白色）
+            // _renderImageToCanvas 内部会在绘制前自动清空，所以这里只需触发刷新即可
             this.eventBus.emit('display:refresh-canvas');
         }
         

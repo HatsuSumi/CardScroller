@@ -446,8 +446,15 @@ export class ParameterControlUIService extends BaseUIService {
      * @returns {void}
      */
     _setupVariableDurationStateWatcher() {
-        // 监听影响时长输入框状态的两个关键状态
-        const watchPaths = ['playback.loop.variableDuration', 'playback.loop.count'];
+        // 监听影响时长输入框状态的三个关键状态：
+        // 1. variableDuration: 是否启用变长时长
+        // 2. count: 循环次数
+        // 3. enabled: 是否启用循环播放（修复Bug：关闭循环播放时应立即启用输入框）
+        const watchPaths = [
+            'playback.loop.variableDuration', 
+            'playback.loop.count',
+            'playback.loop.enabled'
+        ];
         
         // 提取共同的handler，避免创建多个相同的函数
         const handler = () => this._updateDurationInputState();
@@ -459,17 +466,29 @@ export class ParameterControlUIService extends BaseUIService {
 
     /**
      * 更新滚动时长输入框的启用/禁用状态
-     * 当启用变长时长且循环次数大于1时，禁用输入框
+     * 当启用循环播放 且 启用变长时长 且 循环次数大于1时，禁用输入框
      * @private
      * @returns {void}
      * @throws {Error} 当关键UI元素不存在时抛出错误（Fail Fast）
      */
     _updateDurationInputState() {
-        const variableDuration = this.stateManager.state.playback.loop.variableDuration;
-        const loopCount = this.stateManager.state.playback.loop.count;
+        const loopState = this.stateManager.state.playback.loop;
+        const variableDuration = loopState.variableDuration;
+        const loopCount = loopState.count;
+        const isLoopEnabled = loopState.enabled;
         
-        // 只有启用变长时长且循环次数大于1时才禁用输入框
-        const shouldDisable = variableDuration && loopCount > 1;
+        // 只有在(启用循环 且 启用变长时长 且 循环次数大于1)时才禁用输入框
+        // 修复Bug：必须检查isLoopEnabled，否则在关闭循环播放后，
+        // 残留的variableDuration状态会导致输入框被错误禁用
+        const shouldDisable = isLoopEnabled && variableDuration && loopCount > 1;
+        
+        // 🔍 调试埋点：追踪输入框间歇性被禁用的原因
+        // 如果在未开启循环/变长时长时看到此日志，说明状态判断逻辑或状态同步有问题
+        if (shouldDisable) {
+            console.log('[Debug] ParameterControlUIService is disabling duration:', {
+                isLoopEnabled, variableDuration, loopCount, shouldDisable
+            });
+        }
         
         const durationInput = this._getElement('duration');
         if (!durationInput) {

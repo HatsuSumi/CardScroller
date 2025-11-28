@@ -112,6 +112,14 @@ export class PlaybackUIDisablerService extends BaseUIService {
         const isCompleted = this.stateManager.state.playback.scroll.isCompleted;
         const shouldDisable = isPlaying || isPaused || isCompleted;
         
+        // � 调试埋点：追踪输入框间歇性被禁用的原因
+        // 如果在未播放状态下看到此日志，说明状态管理器中的状态异常（如 isCompleted 未重置）
+        if (shouldDisable) {
+            console.log('[Debug] PlaybackUIDisabler is disabling UI:', { 
+                isPlaying, isPaused, isCompleted, shouldDisable 
+            });
+        }
+
         // 批量设置元素的禁用状态
         // 所有元素已在构造函数中通过Fail Fast检查，此处可以安全使用
         this.playingDisabledElements.forEach(elementId => {
