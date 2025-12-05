@@ -2835,6 +2835,14 @@ body.modal-open {
     font-size: 12px;
 }
 
+.highlight-warning .tooltip-trigger {
+    color: #fff;
+}
+
+.highlight-warning .tooltip-trigger:hover {
+    color: #fff;
+}
+
 
 @keyframes gentlePulse {
     0%, 100% {
