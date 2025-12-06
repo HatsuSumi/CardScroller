@@ -78,7 +78,16 @@ export class ImageFileStrategy extends FileProcessStrategy {
         const dataUrl = await this._readAsDataURL(file);
         
         // 获取图片尺寸
-        const dimensions = await this._getImageDimensions(dataUrl);
+        let dimensions;
+        try {
+            dimensions = await this._getImageDimensions(dataUrl);
+        } catch (error) {
+            // 二次确认：如果底层没抛出大文件错误，但文件本身确实很大，在这里拦截并给出明确提示
+            if (file.size > 50 * 1024 * 1024) {
+                 throw new Error('图片加载失败！文件过大或分辨率超出了浏览器限制。\n\n建议尝试：\n1. 将长图切分为多张小图（每张宽度建议小于 30,000 像素）\n2. 降低图片分辨率\n3. 检查文件是否完整');
+            }
+            throw error;
+        }
         
         // 返回原始数据，不做任何格式化处理
         return {
@@ -170,6 +179,14 @@ export class ImageFileStrategy extends FileProcessStrategy {
             
             return result;
         } catch (error) {
+            // 智能判断错误原因
+            // Base64字符串长度超过50MB，且加载失败，极有可能是因为图片尺寸过大导致内存溢出或超出了浏览器Canvas限制
+            const isLargeFile = dataUrl.length > 50 * 1024 * 1024;
+            
+            if (isLargeFile) {
+                throw new Error('图片加载失败！文件可能过大或分辨率超出了浏览器限制。\n\n建议尝试：\n1. 将长图切分为多张小图（每张宽度建议小于 30,000 像素）\n2. 降低图片分辨率\n3. 检查文件是否完整');
+            }
+
             // 将imageLoader的错误转换为业务层错误消息
             throw new Error('图片文件损坏或格式不支持，请检查文件完整性');
         }
