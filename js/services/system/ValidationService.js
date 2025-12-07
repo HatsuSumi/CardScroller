@@ -642,7 +642,7 @@ export class ValidationService {
             return {
                 isValid: false,
                 errorType: 'empty',
-                errorMessage: `${fieldName}不能为空`
+                errorMessage: `请输入有效的${fieldName}（不支持算术表达式）`
             };
         }
         

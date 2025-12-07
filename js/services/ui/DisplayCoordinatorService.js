@@ -90,8 +90,9 @@ export class DisplayCoordinatorService extends BaseUIService {
         this.eventBus.on('position:end-changed', handlePositionChange);
         
         // 监听滚动速度更新需求
-        this.eventBus.on('ui:scroll-speed-update-needed', () => {
-            this.updateScrollSpeed();
+        this.eventBus.on('ui:scroll-speed-update-needed', (data) => {
+            // 接收可选的 duration 参数（用于处理非法输入时的实时反馈）
+            this.updateScrollSpeed(data ? data.duration : undefined);
         });
         
         // 监听循环提示更新需求
@@ -656,10 +657,11 @@ export class DisplayCoordinatorService extends BaseUIService {
 
     /**
      * 更新滚动速度显示
+     * @param {number} [overrideDuration] - 可选的覆盖时长（用于输入时的实时预览，即使值非法）
      * @returns {void}
      * @throws {Error} 当必需的DOM元素缺失时抛出错误（Fail Fast）
      */
-    updateScrollSpeed() {
+    updateScrollSpeed(overrideDuration) {
         const scrollSpeedEl = this._getElement('scrollSpeed');
         if (!scrollSpeedEl) {
             throw new Error('DisplayCoordinatorService.updateScrollSpeed: scrollSpeed element not found');
@@ -669,12 +671,22 @@ export class DisplayCoordinatorService extends BaseUIService {
         const scrollState = this.stateManager.state.playback.scroll;
         const startPos = scrollState.startPosition;
         const endPos = scrollState.endPosition;
-        const duration = scrollState.duration;
+        
+        // 优先使用传入的 overrideDuration，否则使用状态中的 duration
+        // 注意：overrideDuration 可能是非法值（如 0 或负数），这是预期的，用于显示占位符
+        const duration = overrideDuration !== undefined ? overrideDuration : scrollState.duration;
         
         // 检查数据有效性 - 防止在状态未初始化时显示异常
-        if (!this._validatePositionData(startPos, endPos) ||
-            duration === undefined || duration === null || isNaN(duration)) {
+        if (!this._validatePositionData(startPos, endPos)) {
             this._setElementToDefault(scrollSpeedEl, 'text-success');
+            return;
+        }
+        
+        // 特殊处理：如果时长非法（空、0、负数），显示占位符 "-"
+        if (duration === null || isNaN(duration) || duration <= 0) {
+            scrollSpeedEl.textContent = '-';
+            scrollSpeedEl.classList.add('text-muted');
+            scrollSpeedEl.classList.remove('text-success');
             return;
         }
         
@@ -682,7 +694,7 @@ export class DisplayCoordinatorService extends BaseUIService {
         const distance = Math.abs(endPos - startPos);
         
         // 计算每秒滚动像素数
-        const speed = duration > 0 ? Math.round(distance / duration) : 0;
+        const speed = Math.round(distance / duration);
         
         // 更新显示
         scrollSpeedEl.textContent = speed;

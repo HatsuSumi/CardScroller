@@ -210,6 +210,24 @@ export class ParameterControlUIService extends BaseUIService {
                 throw new Error(`ParameterControlUIService: Critical UI element not found: #${id}`);
             }
             element.addEventListener('input', (e) => {
+                // 修复：对于数字输入框，如果内容为空或小于最小值，暂时不更新状态
+                // 避免输入中间状态（如空、0）时触发底层的强制验证和回滚
+                if (type === 'number') {
+                    const strVal = e.target.value;
+                    const val = parseFloat(strVal);
+                    const min = parseFloat(element.getAttribute('min')) || 0;
+                    
+                    // 无论值是否合法，都触发速度显示更新请求，让UI层显示当前输入的反馈（如显示 "-"）
+                    // 传递当前输入值，让DisplayCoordinatorService决定如何显示
+                    if (id === 'duration') {
+                        this.eventBus.emit('ui:scroll-speed-update-needed', { duration: strVal === '' ? null : val });
+                    }
+                    
+                    if (strVal === '' || (!isNaN(val) && val < min)) {
+                        return;
+                    }
+                }
+
                 const value = this._parseControlValue(e.target, type, id);
                 // 使用防抖函数更新状态（性能优化：避免输入时的频繁状态更新）
                 debouncedUpdateState(path, value);
@@ -312,6 +330,13 @@ export class ParameterControlUIService extends BaseUIService {
         if (!element) {
             throw new Error(`ParameterControlUIService: UI element not found for state update: #${id}`);
         }
+        
+        // 修复：如果元素当前拥有焦点（用户正在编辑），则不从后台强制更新值
+        // 避免防抖延迟导致的状态回弹（例如：用户输入1后立即删除，300ms后后台更新为1并强制回填到输入框）
+        if (document.activeElement === element) {
+            return;
+        }
+
         if (type === 'boolean') {
             element.checked = newValue;
         } else {

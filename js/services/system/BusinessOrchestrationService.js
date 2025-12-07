@@ -168,14 +168,6 @@ export class BusinessOrchestrationService {
             }
             this._handleImageError({ type: 'dimension-warnings', data });
         });
-        
-        // 滚动错误处理
-        this.eventBus.on('scroll:parameter-validation-error', (error) => {
-            if (!error || !Array.isArray(error.errors) || error.previousValue === undefined) {
-                throw new Error('BusinessOrchestrationService: scroll:parameter-validation-error event requires error with errors array and previousValue');
-            }
-            this._handleScrollParameterValidationError(error);
-        });
     }
 
 
@@ -381,29 +373,6 @@ export class BusinessOrchestrationService {
     }
 
     
-    /**
-     * 处理滚动参数验证错误
-     * @param {Object} error - 错误信息 { paramType, errors, previousValue, newValue }
-     * @private
-     * @returns {void}
-     * @throws {Error} 如果参数无效
-     */
-    _handleScrollParameterValidationError(error) {
-        // Fail Fast: 验证必需参数
-        if (!error || !Array.isArray(error.errors) || error.previousValue === undefined) {
-            throw new Error('BusinessOrchestrationService._handleScrollParameterValidationError: error with errors array and previousValue is required');
-        }
-        
-        const errorMessage = error.errors.join('<br>'); 
-        this.eventBus.emit('ui:show-validation-error', {
-            message: `<p style="margin: 0 0 12px 0;"><strong>滚动参数无效！</strong></p><p style="margin: 0 0 12px 0;">错误详情：<br>${errorMessage}</p><p style="margin: 0;">已恢复为默认值：${error.previousValue}。</p>`,
-            options: {
-                title: '参数验证失败',
-                shortMessage: '滚动参数无效！'
-            }
-        });
-    }
-
     /**
      * 格式化验证错误消息
      * 统一错误消息的显示格式

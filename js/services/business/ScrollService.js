@@ -188,13 +188,7 @@ export class ScrollService {
                 { silent: true }
             );
             
-            // 发出业务错误事件，由 System 层（BusinessOrchestrationService）决定如何显示
-            this.eventBus.emit('scroll:parameter-validation-error', {
-                paramType: result.paramType,
-                errors: result.errors,
-                previousValue: result.previousValue,
-                newValue: result.newValue
-            });
+            // 对应的UI弹窗处理逻辑已被移除，此处只需完成静默恢复即可
         }
     }
 
