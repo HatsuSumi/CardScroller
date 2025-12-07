@@ -88,7 +88,7 @@
 | `ScrollStrategyManager.js` | 滚动策略注册和管理 | `Map.set`, `Map.get`, `Map.values` |
 | `EntryAnimationStrategy.js` | 入场动画算法（淡入、滑入、缩放、旋转缩放、模糊缩放、翻转、弹跳、摇摆、故障、波浪揭示等14种效果） | 无（纯数学计算） |
 | `EntryAnimationStrategyManager.js` | 入场动画策略注册和管理 | `Map.set`, `Map.get`, `Map.values`, `Array.from` |
-| `FileProcessStrategy.js` | 文件处理策略（图片文件） | `Promise`, `FileReader`, 正则表达式 |
+| `FileProcessStrategy.js` | 文件处理策略（图片文件），使用 Blob URL 处理超大图片，捕获浏览器解码限制 | `Promise`, `URL.createObjectURL`, 正则表达式 |
 | `FileProcessStrategyManager.js` | 文件策略注册和管理 | `Map.values()` |
 | `TransitionFragmentPool.js` | 过渡动画碎片对象池（网格遮罩转场DOM元素复用） | `querySelector`, `cloneNode`, `Map` |
 

@@ -62,7 +62,7 @@ export class ImageFileStrategy extends FileProcessStrategy {
 
     /**
      * 处理图片文件
-     * 读取文件数据为DataURL，提取图片原始尺寸和元数据。
+     * 为文件创建Blob URL（支持超大文件），提取图片原始尺寸和元数据。
      * 
      * @param {File} file - 文件对象
      * @returns {Promise<Object>} 处理结果 {fileName, fileSize, width, height, dataUrl, lastModified}
@@ -74,20 +74,13 @@ export class ImageFileStrategy extends FileProcessStrategy {
             throw new Error('File parameter is required for image processing');
         }
         
-        // 读取文件为DataURL
-        const dataUrl = await this._readAsDataURL(file);
+        // 使用 Blob URL 代替 Base64
+        // 原因：Base64 字符串在大文件（>100MB）时会导致浏览器崩溃或超出字符串长度限制
+        // URL.createObjectURL 极其高效，几乎瞬间完成，且内存占用极低
+        const blobUrl = URL.createObjectURL(file);
         
         // 获取图片尺寸
-        let dimensions;
-        try {
-            dimensions = await this._getImageDimensions(dataUrl);
-        } catch (error) {
-            // 二次确认：如果底层没抛出大文件错误，但文件本身确实很大，在这里拦截并给出明确提示
-            if (file.size > 50 * 1024 * 1024) {
-                 throw new Error('图片加载失败！文件过大或分辨率超出了浏览器限制。\n\n建议尝试：\n1. 将长图切分为多张小图（每张宽度建议小于 30,000 像素）\n2. 降低图片分辨率\n3. 检查文件是否完整');
-            }
-            throw error;
-        }
+        const dimensions = await this._getImageDimensions(blobUrl);
         
         // 返回原始数据，不做任何格式化处理
         return {
@@ -95,7 +88,7 @@ export class ImageFileStrategy extends FileProcessStrategy {
             fileSize: file.size,
             width: dimensions.width,
             height: dimensions.height,
-            dataUrl: dataUrl,
+            dataUrl: blobUrl, // 注意：为了保持接口兼容性，字段名仍为dataUrl，但实际内容为Blob URL
             lastModified: file.lastModified 
         };
     }
@@ -131,43 +124,16 @@ export class ImageFileStrategy extends FileProcessStrategy {
     }
 
     /**
-     * 读取文件为DataURL
-     * @param {File} file - 文件对象
-     * @returns {Promise<string>} DataURL字符串
-     * @throws {Error} 当文件读取失败时抛出错误
-     * @private
-     */
-    _readAsDataURL(file) {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const result = e.target.result;
-                // 清理引用，帮助垃圾回收
-                reader.onload = null;
-                reader.onerror = null;
-                resolve(result);
-            };
-            reader.onerror = (error) => {
-                // 清理引用，帮助垃圾回收
-                reader.onload = null;
-                reader.onerror = null;
-                reject(error);
-            };
-            reader.readAsDataURL(file);
-        });
-    }
-
-    /**
      * 获取图片尺寸
-     * @param {string} dataUrl - 图片DataURL
+     * @param {string} imageUrl - 图片URL (Data URL 或 Blob URL)
      * @returns {Promise<{width: number, height: number}>} 图片尺寸
      * @throws {Error} 当图片文件损坏或格式不支持时抛出错误
      * @private
      */
-    async _getImageDimensions(dataUrl) {
+    async _getImageDimensions(imageUrl) {
         try {
             // 使用统一的图片加载工具函数
-            const img = await loadImageFromDataURL(dataUrl);
+            const img = await loadImageFromDataURL(imageUrl);
             
             const result = {
                 width: img.naturalWidth,
@@ -179,16 +145,8 @@ export class ImageFileStrategy extends FileProcessStrategy {
             
             return result;
         } catch (error) {
-            // 智能判断错误原因
-            // Base64字符串长度超过50MB，且加载失败，极有可能是因为图片尺寸过大导致内存溢出或超出了浏览器Canvas限制
-            const isLargeFile = dataUrl.length > 50 * 1024 * 1024;
-            
-            if (isLargeFile) {
-                throw new Error('图片加载失败！文件可能过大或分辨率超出了浏览器限制。\n\n建议尝试：\n1. 将长图切分为多张小图（每张宽度建议小于 30,000 像素）\n2. 降低图片分辨率\n3. 检查文件是否完整');
-            }
-
-            // 将imageLoader的错误转换为业务层错误消息
-            throw new Error('图片文件损坏或格式不支持，请检查文件完整性');
+            // 捕获浏览器底层加载错误（通常是内存溢出或纹理超限）
+            throw new Error('图片加载失败！图片尺寸可能超出了当前浏览器的处理极限。\n\n建议尝试：\n1. 将超长图片切分为多张小图（推荐每张宽度 < 30,000px）\n2. 降低图片分辨率');
         }
     }
 

@@ -27,8 +27,12 @@ export function loadImageFromDataURL(imageData) {
         throw new Error('loadImageFromDataURL: imageData must be a non-empty string');
     }
     
-    if (!imageData.startsWith('data:image/')) {
-        throw new Error('loadImageFromDataURL: imageData must be a valid data URL starting with "data:image/"');
+    // 验证是否为有效的数据源（支持 Base64 Data URL 或 Blob URL）
+    const isDataUrl = imageData.startsWith('data:image/');
+    const isBlobUrl = imageData.startsWith('blob:');
+    
+    if (!isDataUrl && !isBlobUrl) {
+        throw new Error('loadImageFromDataURL: imageData must be a valid data URL (starting with "data:image/") or blob URL (starting with "blob:")');
     }
 
     return new Promise((resolve, reject) => {
