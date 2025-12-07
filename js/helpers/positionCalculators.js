@@ -7,7 +7,6 @@
  * 当前被使用的模块：
  * - ImageService (services/business/ImageService.js) - 计算替换图片的默认结束位置
  * - BusinessOrchestrationService (services/system/BusinessOrchestrationService.js) - 计算上传图片的默认结束位置
- * - ScrollAnimationService (services/business/ScrollAnimationService.js) - 像素位置转滚动距离
  * - DisplayCoordinatorService (services/ui/DisplayCoordinatorService.js) - 计算锁定时的默认结束位置
  * - PositionSelectorService (services/modal/PositionSelectorService.js) - 坐标转换计算
  * - PositionSliderService (services/ui/PositionSliderService.js) - 滑块值转换

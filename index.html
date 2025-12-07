@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
     
     <!-- ECharts 数据可视化 -->
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://unpkg.com/echarts@5.4.3/dist/echarts.min.js"></script>
     
 </head>
 <body>
@@ -507,17 +507,17 @@
                                 <span class="info-value" id="detailDownsampledDimensions">-</span>
                             </div>
                             <div class="info-row" id="actualDimensionsRow">
-                                <span class="info-label">实际图片尺寸:</span>
+                                <span class="info-label">逻辑全图尺寸 <span class="tooltip-trigger" data-tooltip="基于当前缩放比例计算出的完整图片尺寸。实际渲染时仅绘制可视区域以提升性能（虚拟滚动技术）。">ⓘ</span>:</span>
                                 <span class="info-value" id="detailActualDimensions">-</span>
                             </div>
                             <div class="info-tip" id="actualDimensionsTip">
                                 <div class="tip-icon">💡</div>
                                 <div class="tip-content">
-                                    <strong>什么是实际图片尺寸？</strong><br>
-                                    这是图片在您当前浏览器中实际显示的像素大小，受以下因素影响：<br>
+                                    <strong>什么是逻辑全图尺寸？</strong><br>
+                                    这是图片在您当前浏览器中逻辑上的完整显示尺寸（即便屏幕只显示了一部分），受以下因素影响：<br>
                                     1. 浏览器窗口大小：<span id="viewportSize">-</span><br>
                                     2. 图片高度超过视口高度时的自动等比例缩放。<br>
-                                    <em id="calculationExample">计算示例：原图 40542×4500 → 实际显示 12181×1352 → 缩放了30%</em>
+                                    <em id="calculationExample">计算示例：原图 40542×4500 → 逻辑尺寸 12181×1352 → 缩放了30%</em>
                                 </div>
                             </div>
                             <div class="info-row">

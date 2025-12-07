@@ -8,16 +8,12 @@
  * 当前依赖的模块：
  * - BaseUIService (base/BaseUIService.js) - UI服务基类，提供DOM缓存功能 (通过继承)
  * - scrollStrategyManager (patterns/scroll/ScrollStrategyManager.js) - 滚动策略管理器 (通过DI注入)
- * - getScrollCanvas (helpers/canvasAccessors.js) - Canvas元素访问工具函数
- * - convertPixelPositionToScrollDistance (helpers/positionCalculators.js) - 位置转换工具函数
  * - calculateActualFPS, calculateTheoreticalFPS (helpers/performanceUtils.js) - 实际FPS计算、理论FPS计算工具函数
  * - stateManager (core/StateManager.js) - 状态管理器，访问滚动状态和图片状态 (通过DI注入)
  * - eventBus (core/EventBus.js) - 事件总线，发送进度事件 (通过DI注入)
  * - performanceMonitorService (business/PerformanceMonitorService.js) - 性能监控服务，收集性能数据 (通过DI注入)
  */
 import { BaseUIService } from '../base/BaseUIService.js';
-import { getScrollCanvas } from '../../helpers/canvasAccessors.js';
-import { convertPixelPositionToScrollDistance } from '../../helpers/positionCalculators.js';
 import { calculateActualFPS, calculateTheoreticalFPS } from '../../helpers/performanceUtils.js';
 
 export class ScrollAnimationService extends BaseUIService {
@@ -74,34 +70,8 @@ export class ScrollAnimationService extends BaseUIService {
         this.fpsHistory = [];
         this.FPS_HISTORY_SIZE = 30;
         this.lastFrameTimestamp = null; // 上一帧的RAF timestamp（用于计算真实FPS）
-        
-        // 绑定事件监听
-        this._bindEvents();
     }
     
-    /**
-     * 绑定事件监听
-     * @private
-     * @returns {void}
-     */
-    _bindEvents() {
-        // 监听状态通知：位置变化（通知式，不是命令式）
-        this.eventBus.on('state:scroll-current-position-changed', (data) => {
-            // 性能优化：动画期间跳过事件触发的更新（RAF已直接更新DOM）
-            if (this.isAnimating) return;
-            
-            // Fail Fast: 验证事件数据
-            if (!data || typeof data !== 'object') {
-                throw new Error('ScrollAnimationService: Invalid state:scroll-current-position-changed event data');
-            }
-            if (data.position === undefined) {
-                throw new Error('ScrollAnimationService: position is required in state:scroll-current-position-changed event');
-            }
-            // 自己决定如何响应：更新UI（用于非动画场景，如reset、配置改变等）
-            this.updateImagePosition(data.position);
-        });
-    }
-
     /**
      * 开始动画
      * @param {Object} config - 动画配置对象
@@ -180,9 +150,6 @@ export class ScrollAnimationService extends BaseUIService {
         // 暂存需要回溯的时间，在第一帧RAF回调时使用
         this.pendingElapsedTime = elapsedTime;
         
-        // 性能优化：缓存state引用，避免每帧访问深层对象
-        const scrollState = this.stateManager.state.playback.scroll;
-        
         // 性能优化：预计算固定值，避免每帧重复计算
         const totalDurationInSeconds = config.duration / 1000;
         
@@ -200,6 +167,9 @@ export class ScrollAnimationService extends BaseUIService {
             // 性能监控：记录帧开始时间
             const frameStartTime = performance.now();
             
+            // 🛡️ 获取最新状态引用，防止闭包导致的引用过时问题
+            const scrollState = this.stateManager.state.playback.scroll;
+
             if (!scrollState.isPlaying) {
                 return;
             }
@@ -220,9 +190,6 @@ export class ScrollAnimationService extends BaseUIService {
                 config.startPosition,
                 config.endPosition
             );
-            
-            // 性能优化：动画期间直接更新DOM，跳过事件系统开销
-            this.updateImagePosition(position);
             
             // 更新状态（供外部读取，不触发自己的事件监听器）
             scrollState.currentPosition = position;
@@ -333,49 +300,28 @@ export class ScrollAnimationService extends BaseUIService {
     }
 
     /**
-     * 更新图片位置
-     * @param {number} position - 滚动位置（像素）
+     * 手动更新图片位置（不通过动画）
+     * 用于在动画开始前或结束后重置位置（如入场动画结束后）
+     * @param {number} position - 目标位置
      * @returns {void}
-     * @throws {Error} 当参数无效、DOM元素缺失或状态中的缩放比例或图片宽度缺失时抛出错误
+     * @throws {Error} 当位置参数无效时抛出错误
      */
     updateImagePosition(position) {
-        // Fail Fast: 验证position参数
         if (typeof position !== 'number' || isNaN(position)) {
-            throw new Error('ScrollAnimationService.updateImagePosition: position must be a valid number');
+             throw new Error('ScrollAnimationService.updateImagePosition: position must be a valid number');
         }
         
-        // 使用统一的Canvas访问工具函数获取DOM元素
-        const scrollCanvas = getScrollCanvas();
+        // 更新 State
+        this.stateManager.state.playback.scroll.currentPosition = position;
         
-        // 性能优化：检查缓存是否需要更新（图片加载或缩放改变时）
-        const currentImageWidth = this.stateManager.state.content.image.metadata.width;
-        const currentScalingRatio = this.stateManager.state.content.image.scaling.ratio;
-        
-        // Fail Fast: 验证图片宽度
-        if (!currentImageWidth) {
-            throw new Error('ScrollAnimationService.updateImagePosition: image width is required in state');
-        }
-        
-        // Fail Fast: 验证图片缩放比例
-        if (currentScalingRatio === undefined || currentScalingRatio === null) {
-            throw new Error('ScrollAnimationService.updateImagePosition: scaling.ratio is required in state');
-        }
-        
-        // 检测值是否变化，需要更新缓存
-        if (this.cachedImageWidth !== currentImageWidth || this.cachedScalingRatio !== currentScalingRatio) {
-            this.cachedImageWidth = currentImageWidth;
-            this.cachedScalingRatio = currentScalingRatio;
-            this.cachedMainImageWidth = currentImageWidth * currentScalingRatio;
-        }
-        
-        // 委托给 PositionCalculatorService 进行位置转换
-        const actualScrollDistance = convertPixelPositionToScrollDistance(
-            position,
-            this.cachedImageWidth,
-            this.cachedMainImageWidth
-        );
-        
-        scrollCanvas.style.setProperty('--scroll-offset', `${actualScrollDistance}px`);
+        // 发送进度事件以触发 UI 更新
+        // 这对于在 isPlaying 为 true 时强制更新 UI 是必须的（因为 stateWatcher 会被忽略）
+        this.eventBus.emit('scroll:progress', {
+            progress: 0,
+            position: position,
+            elapsed: 0,
+            totalDuration: 0
+        });
     }
 
 }

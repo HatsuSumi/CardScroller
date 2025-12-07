@@ -238,15 +238,65 @@ export class CanvasRenderService {
         const ctx = this._getContext(canvas);
         
         // 获取Canvas的逻辑尺寸（CSS像素）
-        const canvasWidth = parseFloat(canvas.style.width) || canvas.width;
-        const canvasHeight = parseFloat(canvas.style.height) || canvas.height;
+        // Fail Fast: 严禁使用 fallback (|| canvas.width)，必须确保 style.width 已正确设置
+        const canvasWidth = parseFloat(canvas.style.width);
+        const canvasHeight = parseFloat(canvas.style.height);
         
-        // 绘制图片的指定区域到Canvas
-        // drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh)
+        if (!Number.isFinite(canvasWidth) || canvasWidth <= 0) {
+            throw new Error(`CanvasRenderService.drawImageClipped: canvas.style.width is invalid (${canvas.style.width}). Layout not initialized?`);
+        }
+        if (!Number.isFinite(canvasHeight) || canvasHeight <= 0) {
+            throw new Error(`CanvasRenderService.drawImageClipped: canvas.style.height is invalid (${canvas.style.height}). Layout not initialized?`);
+        }
+        
+        // -------------------------------------------------------
+        // 🛡️ 修复拉伸 Bug：手动计算裁剪区域，保持源/目比例一致
+        // -------------------------------------------------------
+        
+        // 1. 计算有效的源区域（与图片边界取交集）
+        const imageWidth = image.naturalWidth;
+        const imageHeight = image.naturalHeight;
+        
+        // 有效的起始点（不能小于0）
+        const validSourceX = Math.max(0, sourceX);
+        const validSourceY = Math.max(0, sourceY);
+        
+        // 有效的结束点（不能超过图片尺寸）
+        const validSourceRight = Math.min(imageWidth, sourceX + sourceWidth);
+        const validSourceBottom = Math.min(imageHeight, sourceY + sourceHeight);
+        
+        // 有效的宽度和高度
+        const validSourceWidth = Math.max(0, validSourceRight - validSourceX);
+        const validSourceHeight = Math.max(0, validSourceBottom - validSourceY);
+        
+        // 如果裁剪后无内容，直接返回（清空之前已经做过了）
+        if (validSourceWidth <= 0 || validSourceHeight <= 0) {
+            return;
+        }
+        
+        // 2. 计算目标区域（映射到Canvas上）
+        // 我们需要计算有效源区域在原始请求区域中的相对偏移和比例
+        
+        // X轴比例因子：Canvas宽 / 请求源宽
+        const scaleX = canvasWidth / sourceWidth;
+        // Y轴比例因子：Canvas高 / 请求源高
+        const scaleY = canvasHeight / sourceHeight;
+        
+        // 目标起始点 X：原始0 + (有效源X - 请求源X) * 缩放
+        // 如果 sourceX < 0，validSourceX = 0，偏移为 -sourceX。
+        // 如果 sourceX > 0，validSourceX = sourceX，偏移为 0。
+        const destX = (validSourceX - sourceX) * scaleX;
+        const destY = (validSourceY - sourceY) * scaleY;
+        
+        // 目标宽度和高度：有效源宽 * 缩放
+        const destWidth = validSourceWidth * scaleX;
+        const destHeight = validSourceHeight * scaleY;
+        
+        // 3. 绘制
         ctx.drawImage(
             image,
-            sourceX, sourceY, sourceWidth, sourceHeight,  // 源图片裁剪区域
-            0, 0, canvasWidth, canvasHeight               // 目标Canvas区域
+            validSourceX, validSourceY, validSourceWidth, validSourceHeight,  // 源图片裁剪区域
+            destX, destY, destWidth, destHeight                               // 目标Canvas区域
         );
     }
     

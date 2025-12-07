@@ -54,6 +54,10 @@ export class DisplayCoordinatorService extends BaseUIService {
         this.stateWatcherService = stateWatcherService;
         this.canvasRenderService = canvasRenderService;
         
+        // 内部状态标志：标记图片是否正在加载
+        // 用于拦截加载期间的渲染请求，防止使用错误的 Canvas 尺寸渲染
+        this.isImageLoading = false;
+        
         // 窗口尺寸变化处理器（防抖优化）
         this.resizeHandler = null;
     }
@@ -125,11 +129,6 @@ export class DisplayCoordinatorService extends BaseUIService {
             if (imageData) {
                 this._handleImageDataChange();
             }
-        });
-
-        // 监听图片卸载事件，清理图片显示
-        this.eventBus.on('image:unloaded', () => {
-            this._clearImageDisplay();
         });
         
         // 监听重新绘制完整图片事件（入场动画完成后需要恢复完整图片）
@@ -214,6 +213,33 @@ export class DisplayCoordinatorService extends BaseUIService {
         
         // 监听滚动位置变化，更新侧边栏位置显示
         this._setupPositionDisplayWatchers();
+        
+        // 监听滚动进度事件
+        this.eventBus.on('scroll:progress', (data) => {
+            // Fail Fast: 验证事件数据
+            if (!data || typeof data.position !== 'number') {
+                // 动画循环中不抛出错误以免 crash，但在控制台报错
+                console.error('DisplayCoordinatorService: Invalid scroll:progress data', data);
+                return;
+            }
+            this.renderViewport(data.position);
+        });
+
+        // 监听滚动位置状态变化（处理非动画场景，如滑块拖拽）
+        this.stateWatcherService.watchState('playback.scroll.currentPosition', (position) => {
+            // Fail Fast: 验证位置有效性
+            if (position === undefined || position === null || isNaN(position)) {
+                return;
+            }
+            
+            // 避免冲突：如果正在播放动画，由 scroll:progress 驱动渲染，此处忽略
+            // 这样可以防止每一帧触发两次渲染
+            if (this.stateManager.state.playback.scroll.isPlaying) {
+                return;
+            }
+            
+            this.renderViewport(position);
+        });
     }
 
     /**
@@ -268,18 +294,26 @@ export class DisplayCoordinatorService extends BaseUIService {
         const imageData = this.stateManager.state.content.image.data;
         
         if (mainImage && scrollCanvas && imageData) {
+            // 🛡️ 关键修复：标记图片正在加载
+            // 在图片完全加载并完成布局计算之前，拦截所有渲染请求
+            // 这防止了因 Canvas 尺寸未更新(如默认为200px)导致的画面拉伸/异常
+            this.isImageLoading = true;
+            
             // 设置隐藏图片的源
             mainImage.src = imageData;
             
             // 图片加载完成后，更新显示
             mainImage.addEventListener('load', () => {
                 // 图片加载完成后总是重新计算缩放信息
-                // 因为视口大小可能变化，配置导入的scaling不一定适用当前环境
                 const imageWidth = this.stateManager.state.content.image.metadata.width;
                 this.updateImageScaling(imageWidth);
                 
                 // 根据是否启用入场动画，渲染对应的Canvas并设置显示/隐藏状态
                 this._switchCanvasByEntryAnimationState();
+                
+                // ✅ 关键修复：在触发渲染之前解除加载锁定
+                // 防止 updateMainDisplayPosition 调用 renderViewport 时被自己的锁拦截导致空白
+                this.isImageLoading = false;
                 
                 this.updateMainDisplayPosition();
                 this.updateScrollDistance();
@@ -359,28 +393,24 @@ export class DisplayCoordinatorService extends BaseUIService {
         
         // 判断是否仅需渲染视口背景色（优化模式）
         // 如果是背景色模式，我们不需要创建全尺寸的超大 Canvas，只需要视口大小即可
+        // 【重构说明】现在无论是背景色模式还是滚动模式，都只创建视口大小的 Canvas (Virtual Scrolling)
         const isViewportBackgroundOnly = entryAnimationEnabled && !forceFullImage;
         
         let targetWidth, targetHeight;
         
-        if (isViewportBackgroundOnly) {
-            // 🚀 性能优化：只创建视口大小的 Canvas
-            // 解决 Canvas 物理尺寸超过浏览器限制（如 16384px）导致渲染失效的问题
-            const container = this._getElement('scrollContainer');
-            
-            // Fail Fast: 验证容器是否存在
-            // scrollContainer 是核心 UI 元素，如果缺失说明 DOM 结构异常，必须报错
-            if (!container) {
-                throw new Error('DisplayCoordinatorService._renderImageToCanvas: scrollContainer element not found');
-            }
-            
-            targetWidth = container.clientWidth;
-            targetHeight = container.clientHeight;
-        } else {
-            // 完整图片模式：必须创建全尺寸 Canvas 以容纳完整长图
-            targetWidth = scaling.scaledWidth;
-            targetHeight = scaling.scaledHeight;
+        // 获取容器尺寸（视口尺寸）
+        const container = this._getElement('scrollContainer');
+        
+        // Fail Fast: 验证容器是否存在
+        // scrollContainer 是核心 UI 元素，如果缺失说明 DOM 结构异常，必须报错
+        if (!container) {
+            throw new Error('DisplayCoordinatorService._renderImageToCanvas: scrollContainer element not found');
         }
+        
+        // 无论是哪种模式，Canvas 尺寸始终等于视口尺寸
+        // 解决 Canvas 物理尺寸超过浏览器限制（如 16384px）导致渲染失效的问题
+        targetWidth = container.clientWidth;
+        targetHeight = container.clientHeight;
         
         // 设置Canvas尺寸
         this.canvasRenderService.setupCanvas(canvas, targetWidth, targetHeight);
@@ -396,7 +426,6 @@ export class DisplayCoordinatorService extends BaseUIService {
                 canvas.style.backgroundColor = backgroundColor;
 
                 // 使用CanvasRenderService填充背景色
-                // 使用计算出的 targetWidth/targetHeight (即视口尺寸)
                 this.canvasRenderService.fillRect(
                     canvas, 
                     0, 
@@ -410,19 +439,90 @@ export class DisplayCoordinatorService extends BaseUIService {
                 canvas.style.backgroundColor = '';
             }
         } else {
-            // 未启用入场动画 或 强制模式：绘制完整图片
+            // 未启用入场动画 或 强制模式：绘制当前视口内容的切片
             // 清除 CSS 背景色
             canvas.style.backgroundColor = '';
             
-            this.canvasRenderService.drawImageClipped(
-                canvas,
-                image,
-                0,
-                0,
-                image.naturalWidth,
-                image.naturalHeight
-            );
+            // 获取当前滚动位置进行初始渲染
+            let currentPosition = this.stateManager.state.playback.scroll.currentPosition;
+            
+            // Fail Fast: 验证状态完整性
+            if (currentPosition === undefined || currentPosition === null || isNaN(currentPosition)) {
+                throw new Error('DisplayCoordinatorService: playback.scroll.currentPosition is missing or invalid in state');
+            }
+            
+            // 执行虚拟滚动渲染
+            this.renderViewport(currentPosition);
         }
+    }
+
+    /**
+     * 渲染可视区域（虚拟滚动核心）
+     * @param {number} scrollPosition - 当前滚动的逻辑像素位置
+     * @throws {Error} 当位置参数无效或依赖状态缺失时抛出错误（Fail Fast）
+     */
+    renderViewport(scrollPosition) {
+        // Fail Fast: 验证参数类型
+        if (typeof scrollPosition !== 'number' || isNaN(scrollPosition)) {
+            throw new Error(`DisplayCoordinatorService.renderViewport: scrollPosition must be a valid number, got ${scrollPosition}`);
+        }
+        
+        // 🛡️ 关键修复：如果图片正在加载，坚决不渲染
+        // 防止在 Canvas 尺寸尚未更新时渲染，导致画面拉伸
+        if (this.isImageLoading) {
+            return;
+        }
+
+        // Fail Fast: 验证DOM元素存在
+        const mainImage = this._getElement('mainImage');
+        const scrollCanvas = this._getElement('scrollCanvas');
+        const entryCanvas = this._getElement('entryCanvas');
+        // 🆕 获取容器元素用于可见性检查
+        const scrollContainer = this._getElement('scrollContainer');
+        
+        if (!mainImage) {
+            throw new Error('DisplayCoordinatorService.renderViewport: mainImage element not found');
+        }
+        if (!scrollCanvas) {
+            throw new Error('DisplayCoordinatorService.renderViewport: scrollCanvas element not found');
+        }
+
+        // 🛡️ 防御：如果容器不可见（高度为0），无法计算正确的采样区域，跳过渲染
+        // Fail Fast: 验证 Scaling 状态
+        const scaling = this.stateManager.state.content.image.scaling;
+        if (!scaling || typeof scaling.ratio !== 'number' || scaling.ratio <= 0) {
+            throw new Error('DisplayCoordinatorService.renderViewport: invalid scaling state');
+        }
+
+        // 获取最新的 Canvas 尺寸（逻辑像素）
+        const canvasWidth = scrollCanvas.width / window.devicePixelRatio; 
+        // 获取Canvas高度（逻辑像素），用于计算垂直缩放比例
+        const canvasHeight = scrollCanvas.height / window.devicePixelRatio;
+        
+        // 核心计算
+        const scale = scaling.ratio;
+        
+        // 计算源图像上的采样区域
+        // scrollPosition 已经是原始像素坐标，不需要除以 scale
+        let sourceX = scrollPosition;
+        let sourceWidth = canvasWidth / scale;
+        let sourceHeight = canvasHeight / scale;
+        
+        // 边界钳制
+        if (sourceX < 0) sourceX = 0;
+        
+        // 🛡️ 在绘制前清空 Canvas，防止因源图像采样越界导致 Canvas 右侧出现上一帧的残留（视觉上表现为拉伸）
+        this.canvasRenderService.clear(scrollCanvas);
+        
+        // 调用底层服务绘制
+        this.canvasRenderService.drawImageClipped(
+            scrollCanvas,
+            mainImage,
+            sourceX,
+            0,
+            sourceWidth,
+            sourceHeight
+        );
     }
 
     /**
@@ -625,9 +725,11 @@ export class DisplayCoordinatorService extends BaseUIService {
         const displayPosition = reverseScroll ? endPosition : startPosition;
         
         // 转换为缩放后的坐标
-        const scaledPosition = displayPosition * scalingRatio;
+        // const scaledPosition = displayPosition * scalingRatio;
         
-        scrollCanvas.style.setProperty('--scroll-offset', `${scaledPosition}px`);
+        // 【重构说明】不再使用 CSS 变量驱动滚动，改为直接调用 renderViewport 重绘
+        // scrollCanvas.style.setProperty('--scroll-offset', `${scaledPosition}px`);
+        this.renderViewport(displayPosition);
     }
 
     /**
@@ -642,7 +744,7 @@ export class DisplayCoordinatorService extends BaseUIService {
         if (scrollCanvas) {
             // 清空Canvas
             this.canvasRenderService.clear(scrollCanvas);
-            scrollCanvas.style.setProperty('--scroll-offset', '0px');
+            // scrollCanvas.style.setProperty('--scroll-offset', '0px');
         }
         
         if (mainImage) {

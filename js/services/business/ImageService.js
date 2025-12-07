@@ -160,12 +160,7 @@ export class ImageService {
             
         } catch (error) {
             // 捕获业务处理错误（processFile等）
-            this.eventBus.emit('image:upload-error', {
-                fileName: file.name,
-                error: error.message,
-                type: 'exception'
-            });
-            
+            // 不主动发射事件，只返回错误结果
             return {
                 success: false,
                 error: error.message,
@@ -576,18 +571,6 @@ export class ImageService {
                     validation: result.validation,
                     type: result.type
                 });
-            }
-        });
-
-        // 监听状态变化 - 通过 EventBus 监听 StateManager 发出的 state:change 事件
-        this.eventBus.on('state:change', (changeData) => {
-            const { path, newValue, oldValue } = changeData;
-            
-            // 监听图片数据变化
-            if (path === 'content.image.data') {
-                if (!newValue && oldValue) {
-                    this.eventBus.emit('image:unloaded');
-                }
             }
         });
     }

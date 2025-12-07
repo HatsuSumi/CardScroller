@@ -501,20 +501,18 @@ export class PlaybackCoordinatorService {
                             throw new Error('PlaybackCoordinatorService: intervalBeforeScroll must be a non-negative number');
                         }
                         
-                        // 1. 重置scroll-canvas的transform（防止循环播放时CSS transform保留上一次的endPosition）
+                        // 1. 重置位置状态并触发渲染（防止循环播放时位置停留在上一次的endPosition）
+                        // updateImagePosition 会发送 scroll:progress 事件，自动触发 renderViewport 绘制 scroll-canvas
                         this.scrollAnimationService.updateImagePosition(scrollConfig.startPosition);
                         
-                        // 2. 预先绘制scroll-canvas到startPosition（与entry-canvas最后一帧相同）
-                        this.eventBus.emit('display:render-full-image');
-                        
-                        // 3. 立即切换Canvas（两个Canvas显示相同画面，视觉无缝，无需延迟）
+                        // 2. 立即切换Canvas（两个Canvas显示相同画面，视觉无缝，无需延迟）
                         entryCanvas.classList.add('hidden');
                         scrollCanvas.classList.remove('hidden');
                         
-                        // 4. 清空entry-canvas，避免覆盖滚动动画（通过CanvasRenderService）
+                        // 3. 清空entry-canvas，避免覆盖滚动动画（通过CanvasRenderService）
                         this.canvasRenderService.clearCanvas(entryCanvas);
                         
-                        // 5. 如果有间隔时长，使用间隔管理机制延迟开始滚动动画（支持暂停/恢复）；否则立即开始
+                        // 4. 如果有间隔时长，使用间隔管理机制延迟开始滚动动画（支持暂停/恢复）；否则立即开始
                         const startScrollAnimation = () => {
                             // 更新播放阶段为滚动动画
                             this.playbackPhase.current = 'scroll';

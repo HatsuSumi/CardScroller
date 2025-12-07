@@ -242,12 +242,26 @@ export class ImageInfoModalService extends BaseModalService {
 
 
     /**
-     * 获取图片实际显示尺寸（简单DOM读取，协调者职责）
+     * 获取图片实际显示尺寸（逻辑全图尺寸）
+     * 在虚拟滚动架构下，Canvas尺寸仅等于视口尺寸，不能代表图片实际显示尺寸
+     * 因此需要根据缩放比例计算逻辑尺寸
+     * 
      * @returns {Object|null} 包含width和height的对象，如果无法获取则返回null
      * @private
      */
     _getImageDisplayDimensions() {
-        // 使用Canvas元素
+        // 优先使用 State 中的缩放信息计算逻辑尺寸
+        const scaling = this.stateManager.state.content.image.scaling;
+        const imageData = this.currentImageData;
+        
+        if (scaling && typeof scaling.ratio === 'number' && scaling.ratio > 0 && imageData) {
+            return {
+                width: Math.round(imageData.width * scaling.ratio),
+                height: Math.round(imageData.height * scaling.ratio)
+            };
+        }
+        
+        // Fallback: 如果State中没有缩放信息（极少见），尝试读取DOM（虽然在虚拟滚动下可能不准确，但也比没有好）
         const canvas = this._querySelector('#scrollCanvas');
         if (!canvas) return null;
         

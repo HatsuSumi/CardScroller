@@ -290,15 +290,15 @@ CardScroller/
 
 ### 代码规模
 
-- **代码总行数**：27,586 行（不含空行、注释）
-  - JavaScript：18,818 行（68.2%）
-  - CSS：6,981 行（25.3%）
+- **代码总行数**：27,639 行（不含空行、注释）
+  - JavaScript：18,873 行（68.3%）
+  - CSS：6,979 行（25.3%）
   - HTML：1,787 行（6.5%）
 
-- **字符总数**：1,232,577 字符（不含注释）
-  - JavaScript：933,241 字符（75.7%）
-  - CSS：182,036 字符（14.8%）
-  - HTML：117,300 字符（9.5%）
+- **字符总数**：1,236,187 字符（不含注释）
+  - JavaScript：936,775 字符（75.8%）
+  - CSS：181,933 字符（14.7%）
+  - HTML：117,479 字符（9.5%）
 
 ### JavaScript 代码结构
 
@@ -312,7 +312,7 @@ CardScroller/
   - 平均每个类约 11 个方法
   - 包含 async 异步方法、static 静态方法、getter/setter 访问器
 
-- **变量（Variables）**：3,055 个
+- **变量（Variables）**：3,080 个
   - 包含 const/let 声明、类属性、静态属性
 
 > 💡 **数据来源**：以上所有项目规模数据均基于 `count_project_files.py` 脚本自动统计生成
@@ -343,7 +343,7 @@ CardScroller/
 
 **核心难点：**
 
-- 多个坐标系统的双向转换（原图像素 ↔ 滚动距离 ↔ Canvas坐标）
+- 多个坐标系统的双向转换（原图像素 ↔ 滚动距离 ↔ Canvas坐标 ↔ 视口坐标）
 - DPR 处理：物理像素与逻辑尺寸的精确反推，避免不一致
 - 不同组件有独立的坐标系统管理（如 `CardBoundaryEditorService`）
 - 窗口 resize 时的实时更新和坐标重新计算
@@ -373,7 +373,8 @@ CardScroller/
 项目开发时间主要集中在三大动画系统及其用户体验优化：
 
 1. **核心滚动动画**
-   - 5 种滚动策略实现（线性、缓入、缓出、缓入缓出、弹性）
+   - 虚拟滚动架构（Virtual Scrolling）：采用 Canvas 视口渲染技术，突破浏览器 GPU 纹理限制，流畅支持超宽图片（>16384px）
+   - 5 种滚动策略算法（线性、缓入、缓出、缓入缓出、弹性）
    - 高性能 Canvas 渲染优化
    - 循环播放逻辑和变长时长支持
    - 实时进度计算和显示
@@ -387,7 +388,7 @@ CardScroller/
      - 键盘方向键微调（逐像素精确定位）
    - 实时预览和配置管理
 
-3. **UI/UX 动画效果**（33 种 CSS @keyframes 关键帧动画 + 174 个 transition 过渡 + 116 个 :hover 交互 + 5 个 SVG 动画 + 2 个 Canvas 动画 + 1 个 JS 数值动画）
+3. **UI/UX 动画效果**（33 种 CSS @keyframes 关键帧动画 + 173 个 transition 过渡 + 117 个 :hover 交互 + 5 个 SVG 动画 + 2 个 Canvas 动画 + 1 个 JS 数值动画）
    
    **CSS @keyframes 关键帧动画**（33 种）：
    - **页面载入**：fadeInUp（欢迎界面淡入上移30px）、fadeInUpShort（入场动画字段淡入上移20px）、slideInUp（性能面板上滑入场）、fadeOutDown（配置字段退出）
@@ -412,28 +413,28 @@ CardScroller/
    - **性能可视化过渡动画**：
      - maskFadeOut / maskFadeIn（网格遮罩转场：8x8纯色网格方块，0.8s ease-in-out，波浪渐变效果）
    
-   **CSS transition 过渡**（174 个）：
-   - **按钮/控件类**（61 个）：控制面板、折叠按钮、各类功能按钮、复制按钮、刷新按钮等，过渡效果包括 transform、opacity、box-shadow、border-color 等
+   **CSS transition 过渡**（173 个）：
+   - **按钮/控件类**（63 个）：控制面板、折叠按钮、各类功能按钮、复制按钮、刷新按钮等，过渡效果包括 transform、opacity、box-shadow、border-color 等
    - **卡片/列表项类**（23 个）：信息卡片、二维码卡片、序列项、动画项、位置信息项、指标卡片等，效果包括 transform、opacity、box-shadow 等
    - **模态框/对话框类**（20 个）：位置选择、关于页面、图片信息、高级循环、颜色选择器等各类模态框，过渡效果为 opacity + visibility、transform 弹性缓动等
    - **输入控件类**（19 个）：滑块手柄、下拉菜单、复选框、输入框、触发器等，过渡效果包括 border-color、background、transform 等
    - **提示/工具类**（13 个）：拖拽提示、消息通知、工具提示、性能提示、帮助链接等，过渡效果包括 opacity、transform、color 等
-   - **布局/面板类**（10 个）：
+   - **布局/面板类**（9 个）：
      - 侧边栏滑入滑出（transform 0.3s）
      - 配置页面圆形扩散转场（clip-path 0.7s cubic-bezier，从点击位置向外扩散）
      - 配置页面背景覆盖层（opacity 0.3s ease）
      - 图片滚动平滑移动（scrollCanvas transform linear）
      - 进度条、Canvas容器、页面切换等
    - **动画元素类**（4 个）：颜色预设框、气泡菜单、可视化视图等
-   - **其他**（20 个）：图片预览、进度倒计时、隐藏文本、折叠内容、滚动条等
+   - **其他**（22 个）：图片预览、进度倒计时、隐藏文本、折叠内容、滚动条等
    
-   **CSS :hover 交互动画**（116 个）：
+   **CSS :hover 交互动画**（117 个）：
    - **按钮类**（52 个）：各类按钮、关闭按钮、复制按钮等，效果包括颜色变化、阴影增强、缩放、位移（transform translateY）、3D立方体翻转（关于按钮：rotateX 180° + 立方体侧面 + 背景色切换）
    - **卡片类**（10 个）：
      - 信息卡片（上移 translateY(-5px) + 阴影增强 + 顶部渐变条显示 via ::before）
      - 二维码卡片（卡片上移 translateY(-4px) + 内部图片放大 scale 1.05）
      - 卡片编辑器、动画项、位置信息项等
-   - **输入控件类**（14 个）：
+   - **输入控件类**（15 个）：
      - 下拉菜单选项高亮（渐变背景 + 文字颜色变化）
      - 滑块拖动手柄、复选框、输入框边框
      - 颜色选择器预设色（transform scale 1.15 + 边框高亮 + 阴影增强）
@@ -531,7 +532,7 @@ CardScroller/
   - **纯函数工具库** - 防抖（debounce）等无副作用的函数式工具
   - **HTML Template** - DOM模板复用提升性能
   - **现代CSS技术** - Transform、Animation、Flexbox/Grid、CSS Variables等
-  - **Canvas 2D高级应用** - 入场动画渲染、交互式可视化编辑器（卡片边界标记、放大镜）、颜色选择器（HSV色彩空间）、高DPI适配、离屏Canvas优化
+  - **Canvas 2D高级应用** - 虚拟滚动（Virtual Scrolling）、视口裁剪渲染（Viewport Rendering）、入场动画渲染、交互式可视化编辑器、高DPI适配、离屏Canvas优化
   - **SVG + SMIL动画** - 性能监控页面的动态边框跑马灯效果，使用SVG Path、stroke-dasharray/dashoffset、SMIL `<animate>`元素和SVG滤镜实现霓虹发光
   - **图片元数据提取** - PPI信息提取（JPEG/PNG格式）、二进制数据解析（ArrayBuffer、DataView）
   - **颜色处理技术** - HSV色彩空间、RGB/Hex颜色转换、Canvas渲染色彩选择器、EyeDropper API吸取页面颜色

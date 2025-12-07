@@ -172,11 +172,11 @@ export class EntryAnimationService {
         const scaledWidth = Math.ceil(image.naturalWidth * scalingRatio);
         const scaledHeight = Math.ceil(canvasHeight);
         
-        // 设置物理尺寸（不需要DPR，因为只是中间缓存）
-        scaledImageCanvas.width = scaledWidth;
-        scaledImageCanvas.height = scaledHeight;
+        // 设置物理尺寸（乘以DPR以支持高清屏）
+        scaledImageCanvas.width = scaledWidth * dpr;
+        scaledImageCanvas.height = scaledHeight * dpr;
         
-        // 一次性将原图缩放绘制到离屏Canvas
+        // 一次性将原图缩放绘制到离屏Canvas（填满物理尺寸）
         const scaledCtx = scaledImageCanvas.getContext('2d', { alpha: false });
         if (!scaledCtx) {
             throw new Error('EntryAnimationService.startAnimation: Failed to get 2d context for scaled image canvas');
@@ -185,7 +185,7 @@ export class EntryAnimationService {
         scaledCtx.drawImage(
             image,
             0, 0, image.naturalWidth, image.naturalHeight,  // 源：整张原图
-            0, 0, scaledWidth, scaledHeight                  // 目标：缩放后尺寸
+            0, 0, scaledImageCanvas.width, scaledImageCanvas.height // 目标：缩放后物理尺寸
         );
         
         // 🚀 性能优化2：缓存Canvas上下文，避免每帧重复getContext调用
@@ -228,7 +228,7 @@ export class EntryAnimationService {
         // 🚀 性能优化0.1：预先裁剪每张卡片到离屏Canvas
         // 原理：将"每帧4次裁剪"改为"初始化1次裁剪"，动画时只需复制完整Canvas
         // 预计收益：drawImage从9参数（裁剪）降为5参数（复制），每张卡片从122ms降至5ms
-        this._cacheCardCanvases(scaledImageCanvas, scaledWidth, scaledHeight);
+        this._cacheCardCanvases(scaledImageCanvas, scaledHeight);
         
         // 计算总动画时长
         const totalDuration = this._calculateTotalDuration(config);
@@ -367,30 +367,40 @@ export class EntryAnimationService {
      * 
      * @private
      * @param {HTMLCanvasElement} scaledImageCanvas - 预缩放后的完整图片Canvas
-     * @param {number} scaledWidth - 预缩放后的图片宽度
      * @param {number} scaledHeight - 预缩放后的图片高度
      * @returns {void}
      */
-    _cacheCardCanvases(scaledImageCanvas, scaledWidth, scaledHeight) {
+    _cacheCardCanvases(scaledImageCanvas, scaledHeight) {
         // 从HTML模板获取Canvas模板
         const canvasTemplate = document.getElementById('offscreen-canvas-template');
         if (!canvasTemplate) {
             throw new Error('EntryAnimationService._cacheCardCanvases: offscreen-canvas-template not found');
         }
         
+        const dpr = window.devicePixelRatio;
+        // Fail Fast: 验证 devicePixelRatio
+        if (typeof dpr !== 'number' || !isFinite(dpr) || dpr <= 0) {
+            throw new Error('EntryAnimationService._cacheCardCanvases: Invalid window.devicePixelRatio');
+        }
+
         // 为每张卡片创建离屏Canvas并裁剪
         this.cachedCards.forEach((card, index) => {
-            // 计算卡片在预缩放Canvas中的位置和尺寸
-            const cardScaledX = card.leftBoundary * this.cachedScalingRatio;
-            const cardScaledWidth = (card.rightBoundary - card.leftBoundary) * this.cachedScalingRatio;
+            // 计算卡片在预缩放Canvas中的位置和尺寸（逻辑坐标）
+            const cardLogicalX = card.leftBoundary * this.cachedScalingRatio;
+            const cardLogicalWidth = (card.rightBoundary - card.leftBoundary) * this.cachedScalingRatio;
+            
+            // 转换为物理坐标（用于从高清离屏Canvas裁剪）
+            const cardPhysicalX = cardLogicalX * dpr;
+            const cardPhysicalWidth = cardLogicalWidth * dpr;
+            const physicalHeight = scaledHeight * dpr;
             
             // 克隆Canvas元素
             const cardCanvas = canvasTemplate.content.cloneNode(true).querySelector('canvas');
             
             // 🚀 优化0.1补充：向上取整确保Canvas尺寸为整数，避免浮点数导致的精度问题
-            // 这样后续绘制时可以完美匹配，无缩放开销
-            cardCanvas.width = Math.ceil(cardScaledWidth);
-            cardCanvas.height = Math.ceil(scaledHeight);
+            // 设置为物理尺寸以保持清晰度
+            cardCanvas.width = Math.ceil(cardPhysicalWidth);
+            cardCanvas.height = Math.ceil(physicalHeight);
             
             // 获取上下文并裁剪卡片
             const ctx = cardCanvas.getContext('2d', { alpha: true });
@@ -401,8 +411,8 @@ export class EntryAnimationService {
             // 从预缩放Canvas裁剪该卡片区域，填充满整个卡片Canvas
             ctx.drawImage(
                 scaledImageCanvas,
-                cardScaledX, 0, cardScaledWidth, scaledHeight,  // 源：预缩放Canvas中的卡片区域
-                0, 0, cardCanvas.width, cardCanvas.height        // 目标：填充整个卡片Canvas（使用实际尺寸）
+                cardPhysicalX, 0, cardPhysicalWidth, physicalHeight,  // 源：预缩放Canvas中的卡片区域（物理坐标）
+                0, 0, cardCanvas.width, cardCanvas.height        // 目标：填充整个卡片Canvas（物理尺寸）
             );
             
             // 缓存到card对象
@@ -579,6 +589,12 @@ export class EntryAnimationService {
         // 性能监控：初始化drawImage调用计数器
         let drawImageCalls = 0;
         
+        const dpr = window.devicePixelRatio;
+        // Fail Fast: 验证 devicePixelRatio
+        if (typeof dpr !== 'number' || !isFinite(dpr) || dpr <= 0) {
+            throw new Error('EntryAnimationService._renderCards: Invalid window.devicePixelRatio');
+        }
+        
         // 🚀 性能优化5：使用缓存的canvasInfo对象，避免每帧重复创建
         const canvasInfo = this.cachedCanvasInfo;
         
@@ -608,8 +624,9 @@ export class EntryAnimationService {
             const cardInfo = this.cardInfoPool[index];
             cardInfo.x = card.leftBoundary * this.cachedScalingRatio;
             cardInfo.y = 0;
-            cardInfo.width = card.cachedCanvas.width;   // 🚀 直接使用Canvas实际宽度
-            cardInfo.height = card.cachedCanvas.height;  // 🚀 直接使用Canvas实际高度
+            // 还原为逻辑尺寸用于布局计算（源Canvas是物理高清尺寸，目标Context已scale）
+            cardInfo.width = card.cachedCanvas.width / dpr;
+            cardInfo.height = card.cachedCanvas.height / dpr;
             
             // 🚀 性能优化4：缓存策略实例，避免每帧getStrategy查找
             // 策略实例在_calculateCardTimings时已确定，可以预先缓存
