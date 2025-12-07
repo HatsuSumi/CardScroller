@@ -834,17 +834,27 @@ export class CanvasRenderService {
         const ctx = this._getContext(canvas);
         const { progress, gridRows, gridCols, reverseScroll, canvasWidth } = params;
         
+        // 计算源图片物理尺寸与逻辑尺寸的比例
+        // 修复：在高DPI屏幕上，image（缓存Canvas）的物理尺寸是 cardInfo（逻辑尺寸）的 DPR 倍
+        // 如果不乘以这个比例，源裁剪区域将只覆盖图片的左上角，导致内容错位
+        const imgWidth = image instanceof HTMLImageElement ? image.naturalWidth : image.width;
+        const imgHeight = image instanceof HTMLImageElement ? image.naturalHeight : image.height;
+        
+        // 避免除以0
+        const scaleX = cardInfo.width > 0 ? imgWidth / cardInfo.width : 1;
+        const scaleY = cardInfo.height > 0 ? imgHeight / cardInfo.height : 1;
+        
         // 计算每个碎片的尺寸
         const fragmentWidth = cardInfo.width / gridCols;
         const fragmentHeight = cardInfo.height / gridRows;
         
-        // 卡片的基准位置（取整一次，避免每个碎片重复取整导致累积误差）
-        const baseX = Math.round(cardInfo.x);
-        const baseY = Math.round(cardInfo.y);
+        // 卡片的基准位置（使用浮点数，保持与标准渲染一致，避免位置跳变）
+        const baseX = cardInfo.x;
+        const baseY = cardInfo.y;
         
-        // 禁用图像平滑（抗锯齿），避免碎片边缘模糊导致的视觉间隙
-        const oldSmoothing = ctx.imageSmoothingEnabled;
-        ctx.imageSmoothingEnabled = false;
+        // 移除：禁用图像平滑会导致与标准渲染质感不一致（锐利 vs 柔和），造成切换突兀
+        // const oldSmoothing = ctx.imageSmoothingEnabled;
+        // ctx.imageSmoothingEnabled = false;
         
         // 遍历每个碎片
         for (let row = 0; row < gridRows; row++) {
@@ -855,20 +865,24 @@ export class CanvasRenderService {
                 const colNormalized = col / (gridCols - 1);   // 0(左侧) -> 1(右侧)
                 
                 let delayFactor;
+                // 优化：将最大延迟限制在 70% 进度，确保最晚的碎片也有 30% 的时间来完成动画
+                // 避免 delayFactor 接近 1 导致碎片直到最后一帧才开始动，产生视觉跳变
+                const maxDelayRatio = 0.7;
+                
                 if (reverseScroll) {
                     // 反向滚动：从右上(1,0)到左下(0,1)
                     const distanceFromTopRight = Math.sqrt(
                         Math.pow(1 - colNormalized, 2) + Math.pow(rowNormalized, 2)
                     );
                     const maxDistance = Math.sqrt(2);
-                    delayFactor = (distanceFromTopRight / maxDistance);
+                    delayFactor = (distanceFromTopRight / maxDistance) * maxDelayRatio;
                 } else {
                     // 正向滚动：从左下(0,1)到右上(1,0)
                     const distanceFromBottomLeft = Math.sqrt(
                         Math.pow(colNormalized, 2) + Math.pow(1 - rowNormalized, 2)
                     );
                     const maxDistance = Math.sqrt(2);
-                    delayFactor = (distanceFromBottomLeft / maxDistance);
+                    delayFactor = (distanceFromBottomLeft / maxDistance) * maxDelayRatio;
                 }
                 
                 // 跳过尚未开始的碎片（优化性能，同时避免渲染alpha=0的碎片）
@@ -881,17 +895,26 @@ export class CanvasRenderService {
                 // 缓动函数（ease-out cubic）
                 const easeOut = 1 - Math.pow(1 - adjustedProgress, 3);
                 
-                // 计算碎片的精确边界（避免浮点数累积误差导致间隙）
-                const sourceX = Math.round(col * fragmentWidth);
-                const sourceY = Math.round(row * fragmentHeight);
-                const sourceXEnd = (col === gridCols - 1) ? cardInfo.width : Math.round((col + 1) * fragmentWidth);
-                const sourceYEnd = (row === gridRows - 1) ? cardInfo.height : Math.round((row + 1) * fragmentHeight);
-                const actualFragmentWidth = sourceXEnd - sourceX;
-                const actualFragmentHeight = sourceYEnd - sourceY;
+                // 计算碎片的精确边界（使用浮点数，避免取整导致的位置错位）
+                // 修复：应用 DPR 缩放比例到源坐标
+                const sourceX = col * fragmentWidth * scaleX;
+                const sourceY = row * fragmentHeight * scaleY;
+                
+                // 确保最后一个碎片贴合边缘（防止浮点数微小误差）
+                // 但通常直接计算也是足够精确的
+                // const sourceXEnd = (col + 1) * fragmentWidth;
+                // const sourceYEnd = (row + 1) * fragmentHeight;
+                
+                // 直接使用浮点数尺寸，不再取整
+                // 修复：应用 DPR 缩放比例到源尺寸
+                const actualFragmentWidth = fragmentWidth * scaleX;
+                const actualFragmentHeight = fragmentHeight * scaleY;
                 
                 // 目标位置（最终要放在哪里）
-                const destX = baseX + sourceX;
-                const destY = baseY + sourceY;
+                // 注意：目标位置使用的是逻辑坐标（baseX, fragmentWidth），不需要乘以 scaleX
+                // 因为 ctx 已经被 scale(dpr, dpr) 了
+                const destX = baseX + col * fragmentWidth;
+                const destY = baseY + row * fragmentHeight;
                 
                 // 基于行列生成确定性的偏移（使用三角函数让分布更自然）
                 const rowFactor = row / (gridRows - 1);
@@ -973,8 +996,21 @@ export class CanvasRenderService {
             }
         }
         
-        // 恢复图像平滑设置
-        ctx.imageSmoothingEnabled = oldSmoothing;
+        // 终极优化：在动画最后阶段淡入完整图片，掩盖所有微小的位置误差、缝隙和质感差异
+        // 确保 progress=1 时实现无缝切换到标准渲染模式
+        // 配合 maxDelayRatio=0.7，此时所有碎片已基本就位，淡入不会突兀
+        const fadeStart = 0.85;
+        if (progress > fadeStart) {
+            const fadeProgress = (progress - fadeStart) / (1 - fadeStart);
+            ctx.save();
+            ctx.globalAlpha = fadeProgress;
+            // 绘制完整图片（使用逻辑坐标，覆盖在碎片之上）
+            ctx.drawImage(image, baseX, baseY, cardInfo.width, cardInfo.height);
+            ctx.restore();
+        }
+        
+        // 移除：恢复图像平滑设置
+        // ctx.imageSmoothingEnabled = oldSmoothing;
     }
     
     /**
