@@ -104,6 +104,8 @@
     --about-modal-content-transition-duration: 0.4s;
     --about-modal-overlay-opacity-transition-duration: 0.3s;
     --about-modal-overlay-visibility-transition-duration: 0.3s;
+    --personal-website-link-color-transition-duration: 0.3s;
+    --personal-website-link-underline-transition-duration: 0.3s;
     --advanced-loop-modal-close-transition-duration: 0.2s;
     --advanced-loop-modal-content-transition-duration: 0.3s;
     --advanced-loop-modal-overlay-transition-duration: 0.3s;
@@ -2936,6 +2938,48 @@ body.modal-open {
 .contact-item-copy-btn:disabled:hover {
     transform: none;
     box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
+}
+
+/* 个人网站链接样式 */
+.personal-website-item {
+    margin-bottom: 1rem;
+    text-align: center;
+}
+
+.website-text {
+    color: rgba(31, 41, 55, 0.8);
+    font-size: 1rem;
+    margin-right: 0.25rem;
+}
+
+.website-link {
+    color: #64b5f6;
+    text-decoration: none;
+    position: relative;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: color var(--personal-website-link-color-transition-duration) ease;
+    display: inline-block;
+}
+
+/* 下划线从左到右展开动画 */
+.website-link::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #64b5f6, #42a5f5);
+    transition: width var(--personal-website-link-underline-transition-duration) ease;
+}
+
+.website-link:hover {
+    color: #42a5f5;
+}
+
+.website-link:hover::after {
+    width: 100%;
 }
 
 .donation-section {
