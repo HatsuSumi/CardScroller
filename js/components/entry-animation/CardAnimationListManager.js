@@ -423,6 +423,13 @@ export class CardAnimationListManager {
      * @returns {void}
      */
     _hideElement(element) {
+        // 🐛 Bug修复：如果元素已经在隐藏状态（hiding）或未显示（没有show类），跳过重复操作
+        // 场景：初始化时触发一次隐藏，用户标记第1条线时又触发一次隐藏
+        // 原因：cardCount从0到0，但_emitChange被调用了2次
+        if (element.classList.contains('hiding') || !element.classList.contains('show')) {
+            return;
+        }
+        
         element.classList.remove('show');
         element.classList.add('hiding');
         
